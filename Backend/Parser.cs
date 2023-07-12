@@ -6,6 +6,7 @@ using System.Globalization;
 using VRage.Game.ModAPI.Ingame;
 using VRage.Game.ModAPI.Ingame.Utilities;
 using VRageMath;
+using VRage.Input;
 
 namespace IngameScript
 {
@@ -14,6 +15,7 @@ namespace IngameScript
         static List<MyIni> IniParsers = new List<MyIni>();
         static int IniCount = 0;
         MyIni myIni;
+        public MyIniParseResult result;
 
         public Parser()
         {
@@ -25,14 +27,22 @@ namespace IngameScript
 
             myIni.Clear();
         }
-        public bool TryParseCustomData(IMyTerminalBlock block)
+        public bool TryParseCustomData(IMyTerminalBlock block, out MyIniParseResult Result)
         {
-            return myIni.TryParse(block.CustomData);
+            var output = myIni.TryParse(block.CustomData, out result);
+            Result = result; 
+            return output;
         }
         public bool ContainsSection(string aSection)
         {
             return myIni.ContainsSection(aSection);
         }
+
+        public bool ContainsKey(string aSection, string aKey)
+        {
+            return myIni.ContainsKey(aSection, aKey);
+        }
+
         public float ParseFloat(string aSection, string aKey, float aDefault = 1)
         {
             return myIni.Get(aSection, aKey).ToSingle(aDefault);
@@ -62,7 +72,7 @@ namespace IngameScript
         public Color ParseColor(string aSection, string aKey, string aDefault = "FA3232FF")
         {
             byte r, g, b, a;
-            myIni.Get(aSection, aKey).ToString(aDefault);
+            aDefault = myIni.Get(aSection, aKey).ToString(aDefault);
             r = HexParse(aDefault, 0, 2);
             g = HexParse(aDefault, 2, 2);
             b = HexParse(aDefault, 4, 2);
@@ -71,7 +81,8 @@ namespace IngameScript
         }
         public byte HexParse(string input, int start, int length)
         {
-            return byte.Parse(input.Substring(start, length), NumberStyles.AllowHexSpecifier);
+            return Convert.ToByte(input.Substring(start, length), 16);
+
         }
         public bool StringContains(string aSection, string tag)
         {

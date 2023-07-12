@@ -26,6 +26,7 @@ namespace IngameScript
     public static class DrawUtilities
     {
         static public SpriteType defaultType = SpriteType.TEXT;
+        static public UpdateFrequency defaultUpdate = UpdateFrequency.None;
         public static void DrawNewSprite(ref MySpriteDrawFrame frame, SpriteData data)
         {
                 var sprite = new MySprite()

@@ -27,19 +27,17 @@ namespace IngameScript
     {
         #region fields
 
-        public IMyTextSurfaceProvider thisBlock;
         public UpdateFrequency UpdateFrequency;
+        public MyGridProgram Program;
         public Dictionary<IMyTextSurface, Dictionary<string, SpriteData>> DisplayOutputs;
         public Dictionary<string, Action<SpriteData>> Commands;
         public Dictionary<IMyTextSurface, HashSet<string>> CommandUsers;
         public Dictionary<IMyTextSurface, UpdateFrequency> DisplayRefreshFreqencies;
-        public int SurfaceCount;
-        public List<string> Keys;
         public string
             DisplayName,
             ScreenSection,
             SpriteSection,
-            ListSection,
+            ListKey,
             TypeKey,
             DataKey,
             SizeKey,
@@ -50,23 +48,23 @@ namespace IngameScript
             FontKey,
             CommandKey,
             UpdateKey;
-        internal char[]
-            toTrim,
-            toSplit;
+        internal char
+            l_coord = '(',
+            r_coord = ')',
+            new_line = '\n',
+            new_entry = '>';
         bool isSingleScreen;
 
         #endregion
 
-        public LinkedDisplay(IMyTerminalBlock block, ref Dictionary<string, Action<SpriteData>> commandsDict, ref List<string> keys)
+        public LinkedDisplay(IMyTerminalBlock block, ref Dictionary<string, Action<SpriteData>> commandsDict, ref MyGridProgram program)
         {
-            thisBlock = block as IMyTextSurfaceProvider;
             Commands = commandsDict;
+            CommandUsers = new Dictionary<IMyTextSurface, HashSet<string>>();
+            DisplayRefreshFreqencies = new Dictionary<IMyTextSurface, UpdateFrequency>();
+            DisplayOutputs = new Dictionary<IMyTextSurface, Dictionary<string, SpriteData>>();
             DisplayName = block.CustomName;
-            SurfaceCount = thisBlock.SurfaceCount;
-            isSingleScreen = SurfaceCount == 1;
-            toTrim = new char[] {'[', ']'};
-            toSplit = new char[] { ',', ' ', '\n' };
-            Keys = keys;
+            Program = program;
         }
 
         #region CustomDataFormat
@@ -94,136 +92,165 @@ namespace IngameScript
         //   ...
         // and so on
 
-    #endregion
-        internal virtual bool TryAddSprites(ref Parser myParser, ref byte index, out UpdateFrequency screenFrequency)
+        #endregion
+        internal virtual bool TryAddSprites(ref IMyTextSurface thisSurface, ref Parser myParser, ref byte index, out UpdateFrequency screenFrequency)
         {
-            screenFrequency = UpdateFrequency.None;
-            var nameList = new List<string>();
+            screenFrequency = DrawUtilities.defaultUpdate;
             var didNotFail = true;
-            var ScreenSection = isSingleScreen ? (this.ScreenSection + "]") : (this.ScreenSection + $" {index}]");
-            var surface = thisBlock.GetSurface(index);
-            CommandUsers.Add(surface, new HashSet<string>());
-            if (myParser.ContainsSection(ScreenSection)) 
+            if (!isSingleScreen)
+                ScreenSection = $"{ScreenSection}_{index}";
+            CommandUsers.Add(thisSurface, new HashSet<string>());
+            if (myParser.ContainsSection(ScreenSection))
             {
-                surface.ContentType = ContentType.SCRIPT; 
-                surface.Script = "";
-                surface.ScriptBackgroundColor = myParser.ParseColor(ScreenSection, ColorKey + "_BG");
-                nameList = myParser.ParseString(ScreenSection, ListSection, "").Trim(toTrim).Split(toSplit).ToList();
-                if (nameList.Count > 0)
-                    foreach (var name in nameList)
+                thisSurface.ContentType = ContentType.SCRIPT;
+                thisSurface.Script = "";
+                thisSurface.ScriptBackgroundColor = myParser.ParseColor(ScreenSection, ColorKey + "_BG");
+                var names = myParser.ParseString(ScreenSection, ListKey);
+                var namesArray = names.Split(new_line);
+                for (int i = 0; i < namesArray.Length; ++i)
+                { namesArray[i] = namesArray[i].Trim(new_entry); namesArray[i] = namesArray[i].Trim(); Program.Echo(namesArray[i]); }
+
+                if (namesArray.Count() > 0)
+                    foreach (var name in namesArray)
                     {
-                        try
+                        
+                        var nametag = $"{SpriteSection}_{name}";
+
+                        if (myParser.ContainsSection(nametag) && namesArray.Contains(name))
                         {
-                            var nametag = SpriteSection + $" {name}]";
- 
-                            if (myParser.ContainsSection(nametag) && nameList.Contains(name))
-                            {
-                                SpriteData sprite = new SpriteData();
-                                //Name
-                                sprite.Name = name;
-                                // >TYPE
-                                sprite.spriteType = (SpriteType)myParser.ParseByte(nametag, TypeKey);
-                                // >DATA
-                                sprite.Data = myParser.ParseString(nametag, DataKey, "FAILED");
-                                // >SIZE
-                                CartesianReader(ref sprite, ref myParser, SizeKey, nametag);
-                                // >ALIGN
-                                sprite.SpriteAlignment = (TextAlignment)myParser.ParseByte(nametag, AlignKey);
-                                // >POSITION
-                                CartesianReader(ref sprite, ref myParser, PositionKey, nametag);
-                                // >ROTATION/SCALE
-                                sprite.SpriteRorS = myParser.ParseFloat(nametag, RotationScaleKey);
-                                // >FONT
+                            SpriteData sprite = new SpriteData();
+                            //Name
+                            sprite.Name = name;
+                            // >TYPE
+                            sprite.spriteType = (SpriteType)myParser.ParseByte(nametag, TypeKey);
+                            // >DATA
+                            sprite.Data = myParser.ParseString(nametag, DataKey, "FAILED");
+                            // >SIZE
+                            CartesianReader(ref sprite, ref myParser, SizeKey, nametag);
+                            // >ALIGN
+                            sprite.SpriteAlignment = (TextAlignment)myParser.ParseByte(nametag, AlignKey);
+                            // >POSITION
+                            CartesianReader(ref sprite, ref myParser, PositionKey, nametag);
+                            // >ROTATION/SCALE
+                            sprite.SpriteRorS = myParser.ParseFloat(nametag, RotationScaleKey);
+                            // >FONT
+                            if (myParser.ContainsKey(nametag, FontKey))
                                 sprite.FontID = sprite.spriteType == DrawUtilities.defaultType ? myParser.ParseString(nametag, FontKey, "White") : "";
-                                // >UPDATE
+                            // >UPDATE
+                            if (myParser.ContainsKey(nametag, UpdateKey))
+                            {
                                 sprite.CommandFrequency = (UpdateFrequency)myParser.ParseByte(nametag, UpdateKey, 0);
                                 screenFrequency |= sprite.CommandFrequency;
-                                // >COMMAND
-                                sprite.CommandString = sprite.CommandFrequency == UpdateFrequency.None ? "" : myParser.ParseString(nametag, CommandKey, "");
-                                if (sprite.CommandFrequency != UpdateFrequency.None && sprite.CommandString != "")
-                                {
-                                    CommandUsers[surface].Add(sprite.Name);
-                                    sprite.Command = Commands[sprite.CommandString];
-                                    sprite.Command.Invoke(sprite);                                  
-                                }
-                                DisplayOutputs[surface].Add(sprite.Name, sprite);
                             }
                             else
-                                didNotFail = false;
+                            {
+                                sprite.CommandFrequency = DrawUtilities.defaultUpdate;
+                                continue;
+                            }
+                            // >COMMAND
+                            if (myParser.ContainsKey(nametag, CommandKey))
+                            {
+                                if (sprite.CommandFrequency != DrawUtilities.defaultUpdate && sprite.CommandString != "")
+                                {
+                                    sprite.CommandString = sprite.CommandFrequency == DrawUtilities.defaultUpdate ? "" : myParser.ParseString(nametag, CommandKey, "!def");
+                                    CommandUsers[thisSurface].Add(sprite.Name);
+                                    sprite.Command = Commands[sprite.CommandString];
+                                    sprite.Command.Invoke(sprite);
+                                }
+                            }
+                                
+
+                            DisplayOutputs[thisSurface].Add(sprite.Name, sprite);
                         }
-                        catch (Exception ex)
-                        {
-                            var sourceString = ex.Source;
+                        else
                             didNotFail = false;
-                            //do something
-                            return didNotFail;
-                        }                                             
+
                     }
             }
             return didNotFail;
         }
-        
+
         internal void CartesianReader(ref SpriteData sprite, ref Parser myParser, string key, string nametag)
         {
-            var coords = myParser.ParseString(nametag, key, "").Trim(toTrim).Split(toSplit);
+            var coords = myParser.ParseString(nametag, key).Split(',');
+            
             if (key == SizeKey)
                 if (sprite.spriteType != DrawUtilities.defaultType)
                 {
-                    sprite.SpriteSizeX = float.Parse(coords.First());
-                    sprite.SpriteSizeY = float.Parse(coords.Last());
+                    sprite.SpriteSizeX = float.Parse(coords.First().Trim(l_coord));
+                    sprite.SpriteSizeY = float.Parse(coords.Last().Trim(r_coord));
                 }
-            
-            else if (key == PositionKey)
-            {
-                sprite.SpritePosX = float.Parse(coords.First());
-                sprite.SpritePosY = float.Parse(coords.Last());
-            }
+
+                else if (key == PositionKey)
+                {
+                    sprite.SpritePosX = float.Parse(coords.First().Trim(l_coord));
+                    sprite.SpritePosY = float.Parse(coords.Last().Trim(r_coord));
+                }
         }
 
         internal void SetKeys() //yes...this is questionable...
         {
-            ScreenSection = Keys[0];
-            SpriteSection = Keys[1];
-            ListSection = Keys[2];
-            TypeKey = Keys[3];
-            DataKey = Keys[4];
-            SizeKey = Keys[5];
-            AlignKey = Keys[6];
-            PositionKey = Keys[7];
-            RotationScaleKey = Keys[8];
-            ColorKey = Keys[9];
-            FontKey = Keys[10];
-            CommandKey = ">CMD"; //DON'T ASK
-            UpdateKey = Keys[11];
+            ScreenSection = "SECT_SCREEN";
+            SpriteSection = "SECT_SPRITE";
+            ListKey = "K_LIST";
+            TypeKey = "K_TYPE";
+            DataKey = "K_DATA";
+            SizeKey = "K_SIZE";
+            AlignKey = "K_ALIGN";
+            PositionKey = "K_COORD";
+            RotationScaleKey = "K_ROTSCAL";
+            ColorKey = "K_COLOR";
+            FontKey = "K_FONT";
+            CommandKey = "K_CMD";
+            UpdateKey = "K_UPDT";
         }
 
-        public virtual void Setup() 
+        public virtual void Setup<T>(T block)
+            where T : IMyTerminalBlock
         {
             SetKeys();
             Parser MyParser = new Parser();
-            var block = thisBlock as IMyTerminalBlock;
-            byte index = 0;
-            if(MyParser.TryParseCustomData(block))
+            byte index = 0;          
+            MyIniParseResult Result;
+            var freq = DrawUtilities.defaultUpdate;
+
+            if (MyParser.TryParseCustomData(block, out Result))
             {
-                while (index <= SurfaceCount - 1)
+                if (block is IMyTextSurface)
                 {
-                    var freq = UpdateFrequency.None;
-                    if (TryAddSprites(ref MyParser, ref index, out freq))
+                    var DisplayBlock = (IMyTextSurface)block;
+                    isSingleScreen = true;
+                    if (TryAddSprites(ref DisplayBlock, ref MyParser, ref index, out freq))
                     {
-                        DisplayOutputs.Add(thisBlock.GetSurface(index), new Dictionary<string, SpriteData>());
-                        DisplayRefreshFreqencies.Add(thisBlock.GetSurface(index), freq);
-                        if (isSingleScreen)
-                            return;
+                        DisplayOutputs.Add(DisplayBlock, new Dictionary<string, SpriteData>());
+                        DisplayRefreshFreqencies.Add(DisplayBlock, freq);
                     }
 
-                        ++index;
-                }               
+                }
+                else if (block is IMyTextSurfaceProvider)
+                {
+                    isSingleScreen = false;
+                    var DisplayBlock = (IMyTextSurfaceProvider)block;
+                    var SurfaceCount = DisplayBlock.SurfaceCount;
+                    var surface = DisplayBlock.GetSurface(index);
+                    while (index <= SurfaceCount - 1)
+                    {
+                        if (TryAddSprites(ref surface, ref MyParser, ref index, out freq))
+                        {
+                            DisplayOutputs.Add(surface, new Dictionary<string, SpriteData>());
+                            DisplayRefreshFreqencies.Add(surface, freq);
+                            ++index;
+                        }
+                    }
+                }
+                
             }
+            else throw new Exception($" PARSE FAILURE: {DisplayName} cd error {Result.Error} at {Result.LineNo}");
 
             foreach (var display in DisplayOutputs)
             {
                 var frame = display.Key.DrawFrame();
-                foreach (var sprite in display.Value)                 
+                foreach (var sprite in display.Value)
                     DrawUtilities.DrawNewSprite(ref frame, sprite.Value);
                 frame.Dispose();
             }
@@ -235,8 +262,8 @@ namespace IngameScript
         public virtual void Update(ref UpdateType sourceFlags)
         {
             var sourceFreqFlags = UpdateUtilities.UpdateConverter(sourceFlags);
-        
-            foreach (var display in DisplayOutputs)            
+
+            foreach (var display in DisplayOutputs)
                 if ((DisplayRefreshFreqencies[display.Key] & sourceFreqFlags) != 0) //is display frequency the same as frequency of update source?
                 {                                                                   // i.e. do we update display on this tick
                     foreach (var name in display.Value.Keys)
@@ -249,7 +276,7 @@ namespace IngameScript
                         DrawUtilities.DrawNewSprite(ref frame, sprite.Value);
                     frame.Dispose();
                 }
-            
+
         }
 
     }

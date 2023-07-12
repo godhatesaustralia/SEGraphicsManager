@@ -8,6 +8,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using VRage;
 using VRage.Collections;
@@ -70,45 +71,55 @@ namespace IngameScript
             });
         }
 
+        #region CustomDataFormat
+
+        // [KEYS]
+        // K0 = [SCREEN 
+        // K1 = [SPRITE 
+        // K2 = >LIST 
+        // K3 = >TYPE
+        // K4 = >DATA
+        // K5 = >SIZE
+        // K6 = >ALIGN
+        // K7 = >POSITION 
+        // K8 = >ROTATION/SCALE
+        // K9 = >COLOR 
+        // K10 = >FONT 
+        // K11 = >UPDATE
+
+        #endregion
+
         public void Init()
         {
-            #region CustomDataFormat
 
-            // [KEYS]
-            // K0 = [SCREEN 
-            // K1 = [SPRITE 
-            // K2 = >LIST 
-            // K3 = >TYPE
-            // K4 = >DATA
-            // K5 = >SIZE
-            // K6 = >ALIGN
-            // K7 = >POSITION 
-            // K8 = >ROTATION/SCALE
-            // K9 = >COLOR 
-            // K10 = >FONT 
-            // K11 = >UPDATE
-
-            #endregion
             RegisterCommands();
-            var section = "[KEYS]";
-            Parser myParser = new Parser();
-            if (myParser.TryParseCustomData(Me))
-                if (myParser.ContainsSection(section))
-                for (int i = 0; i <= IniKeys.Capacity; ++i)
-                    IniKeys[i] = myParser.ParseString(section, $"K{i}");
-            else throw new Exception(" KEY PARSE FAILURE");
+            //var section = "KEYS";
+            //Parser myParser = new Parser();
+            //MyIniParseResult Result;
+            //if (myParser.TryParseCustomData(Me, out Result))
+            //    if (myParser.ContainsSection(section))
+            //    {
+
+            //    }
+            //else throw new Exception($" KEY PARSE FAILURE: {Result.Error} at {Result.LineNo}");
             
             List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
             TerminalSystem.GetBlockGroupWithName("LCT Screen Control").GetBlocks(blocks);
             foreach (var block in blocks)
-                Displays.Add(new LinkedDisplay(block, ref Commands, ref IniKeys));
+            {
+                var display = new LinkedDisplay(block, ref Commands, ref Program);
+                Displays.Add(display);
+                display.Setup(block);
+            }
         }
+
         void UpdateTimes()
         {
             RuntimeMS += Program.Runtime.TimeSinceLastRun.TotalMilliseconds;
             RuntimeMSRounded = (long)RuntimeMS;
             Frame++;
         }
+
         public void Update(UpdateType source)
         {
             UpdateTimes();
