@@ -139,6 +139,8 @@ namespace IngameScript
                             // >POSITION
                             CartesianReader(ref sprite, ref myParser, PositionKey, nametag);
                             //Program.Me.CustomData += $"[{sprite.SpritePosX}, {sprite.SpritePosY}]" + new_line;
+                            //COLOR
+                            sprite.SpriteColor = myParser.ParseColor(nametag, ColorKey);
                             // >ROTATION/SCALE
                             sprite.SpriteRorS = myParser.ParseFloat(nametag, RotationScaleKey);
                             //Program.Me.CustomData += $"[{sprite.SpriteRorS}]" + new_line;
@@ -165,7 +167,8 @@ namespace IngameScript
                                     sprite.Command.Invoke(sprite);
                                 }
                             }
-                            DisplayOutputs[thisSurface].Add(sprite.Name, sprite);
+                            if (!DisplayOutputs[thisSurface].ContainsKey(sprite.Name))
+                                DisplayOutputs[thisSurface].Add(sprite.Name, sprite);
                         }
                         else
                             didNotFail = false;
@@ -228,20 +231,21 @@ namespace IngameScript
                     isSingleScreen = true;
                     if (TryAddSprites(ref DisplayBlock, ref MyParser, ref index, out freq))
                     {
-
                         DisplayRefreshFreqencies.Add(DisplayBlock, freq);
                     }
 
                 }
                 else if (block is IMyTextSurfaceProvider)
                 {
+                    //TODO: I fucked up here somewhere...
                     isSingleScreen = false;
                     var DisplayBlock = (IMyTextSurfaceProvider)block;
                     var SurfaceCount = DisplayBlock.SurfaceCount;
                     var surface = DisplayBlock.GetSurface(index);
                     while (index <= SurfaceCount - 1)
                     {
-                        DisplayOutputs.Add(surface, new Dictionary<string, SpriteData>());
+                        if (!DisplayOutputs.ContainsKey(surface))
+                            DisplayOutputs.Add(surface, new Dictionary<string, SpriteData>());
                         if (TryAddSprites(ref surface, ref MyParser, ref index, out freq))
                         {
                             DisplayRefreshFreqencies.Add(surface, freq);
@@ -257,9 +261,11 @@ namespace IngameScript
             foreach (var display in DisplayOutputs)
             {
                 var frame = display.Key.DrawFrame();
+                var piss = display.Key.TextureSize * 0.5f;
                 foreach (var sprite in display.Value)
                 {
-                    DrawNewSprite(ref frame, sprite.Value);
+                    
+                    DrawNewSprite(ref frame, ref piss, sprite.Value);
                     Program.Me.CustomData += sprite.Value.Name + new_line;
                 }                 
                 frame.Dispose();
@@ -269,7 +275,7 @@ namespace IngameScript
                 UpdateFrequency |= updateFrequency;
         }
 
-        public static void DrawNewSprite(ref MySpriteDrawFrame frame, SpriteData data)
+        public void DrawNewSprite(ref MySpriteDrawFrame frame, ref Vector2 center, SpriteData data)
         {
             //this is kind of a retarded setup but it still is shortedr
             //sprite.Type = data.spriteType;
@@ -287,29 +293,27 @@ namespace IngameScript
 
             //sprite.RotationOrScale = data.SpriteRorS;
             //frame.Add(sprite);
-            var sprite = data.spriteType == SharedUtilities.defaultType ?
-                new MySprite(
+            var sprite = data.spriteType == SharedUtilities.defaultType ? new MySprite(
                 data.spriteType,
                 data.Data,
-                new Vector2(data.SpritePosX, data.SpritePosY),
+                new Vector2(data.SpritePosX, data.SpritePosY), // + center,
                 null,
                 data.SpriteColor,
                 data.FontID,
                 data.SpriteAlignment,
                 data.SpriteRorS
                 )
-                :
-                new MySprite(
+                : new MySprite(
                 data.spriteType,
                 data.Data,
-                new Vector2(data.SpritePosX, data.SpritePosY),
-                new Vector2(data.SpritePosX, data.SpritePosY),
+                new Vector2(data.SpritePosX, data.SpritePosY), // + center,
+                new Vector2(data.SpriteSizeX, data.SpriteSizeY),
                 data.SpriteColor,
                 null,
                 data.SpriteAlignment,
                 data.SpriteRorS
                     );
-
+            Program.Me.CustomData += $"\n{sprite.Type}, \n{sprite.Data}, \n{sprite.Size}, \n{sprite.Position}, \n{sprite.Color}, \n{sprite.Alignment}\n";
             frame.Add(sprite);
 
         }
@@ -326,9 +330,9 @@ namespace IngameScript
                             display.Value[name].Command.Invoke(display.Value[name]);                                                   //i.e. do we run command on this tick
 
                     var frame = display.Key.DrawFrame();
-
+                    var piss = display.Key.TextureSize * 0.5f;
                     foreach (var sprite in display.Value)
-                        DrawNewSprite(ref frame, sprite.Value);
+                        DrawNewSprite(ref frame, ref piss, sprite.Value);
                     frame.Dispose();
                 }
 
