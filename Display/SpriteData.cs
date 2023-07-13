@@ -30,7 +30,7 @@ namespace IngameScript
 
         public SpriteData()
         {
-            spriteType = DrawUtilities.defaultType;
+            spriteType = SharedUtilities.defaultType;
         }
 
         public SpriteData(SpriteType type, string name, string data, float sizeX, float sizeY, TextAlignment alignment, float posX, float posY, float ros, Color color, string fontid = "White", UpdateFrequency updateType = UpdateFrequency.None, string command = "")

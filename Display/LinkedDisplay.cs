@@ -8,6 +8,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.InteropServices;
+using System.Security.Policy;
 using System.Text;
 using VRage;
 using VRage.Collections;
@@ -95,7 +97,7 @@ namespace IngameScript
         #endregion
         internal virtual bool TryAddSprites(ref IMyTextSurface thisSurface, ref Parser myParser, ref byte index, out UpdateFrequency screenFrequency)
         {
-            screenFrequency = DrawUtilities.defaultUpdate;
+            screenFrequency = SharedUtilities.defaultUpdate;
             var didNotFail = true;
             if (!isSingleScreen)
                 ScreenSection = $"{ScreenSection}_{index}";
@@ -121,21 +123,28 @@ namespace IngameScript
                             SpriteData sprite = new SpriteData();
                             //Name
                             sprite.Name = name;
+                            //Program.Me.CustomData += sprite.Name + new_line;
                             // >TYPE
                             sprite.spriteType = (SpriteType)myParser.ParseByte(nametag, TypeKey);
+                            //Program.Me.CustomData += sprite.spriteType.ToString() + new_line;
                             // >DATA
                             sprite.Data = myParser.ParseString(nametag, DataKey, "FAILED");
+                            //Program.Me.CustomData += sprite.Data + new_line;
                             // >SIZE
                             CartesianReader(ref sprite, ref myParser, SizeKey, nametag);
+                            //Program.Me.CustomData += $"[{sprite.SpriteSizeX}, {sprite.SpriteSizeY}]" + new_line;
                             // >ALIGN
                             sprite.SpriteAlignment = (TextAlignment)myParser.ParseByte(nametag, AlignKey);
+                            //Program.Me.CustomData += sprite.SpriteAlignment.ToString() + new_line;
                             // >POSITION
                             CartesianReader(ref sprite, ref myParser, PositionKey, nametag);
+                            //Program.Me.CustomData += $"[{sprite.SpritePosX}, {sprite.SpritePosY}]" + new_line;
                             // >ROTATION/SCALE
                             sprite.SpriteRorS = myParser.ParseFloat(nametag, RotationScaleKey);
+                            //Program.Me.CustomData += $"[{sprite.SpriteRorS}]" + new_line;
                             // >FONT
                             if (myParser.ContainsKey(nametag, FontKey))
-                                sprite.FontID = sprite.spriteType == DrawUtilities.defaultType ? myParser.ParseString(nametag, FontKey, "White") : "";
+                                sprite.FontID = sprite.spriteType == SharedUtilities.defaultType ? myParser.ParseString(nametag, FontKey, "White") : "";
                             // >UPDATE
                             if (myParser.ContainsKey(nametag, UpdateKey))
                             {
@@ -143,23 +152,19 @@ namespace IngameScript
                                 screenFrequency |= sprite.CommandFrequency;
                             }
                             else
-                            {
-                                sprite.CommandFrequency = DrawUtilities.defaultUpdate;
-                                continue;
-                            }
+                                sprite.CommandFrequency = SharedUtilities.defaultUpdate;
+                            
                             // >COMMAND
                             if (myParser.ContainsKey(nametag, CommandKey))
                             {
-                                if (sprite.CommandFrequency != DrawUtilities.defaultUpdate && sprite.CommandString != "")
+                                if (sprite.CommandFrequency != SharedUtilities.defaultUpdate && sprite.CommandString != "")
                                 {
-                                    sprite.CommandString = sprite.CommandFrequency == DrawUtilities.defaultUpdate ? "" : myParser.ParseString(nametag, CommandKey, "!def");
+                                    sprite.CommandString = sprite.CommandFrequency == SharedUtilities.defaultUpdate ? "" : myParser.ParseString(nametag, CommandKey, "!def");
                                     CommandUsers[thisSurface].Add(sprite.Name);
                                     sprite.Command = Commands[sprite.CommandString];
                                     sprite.Command.Invoke(sprite);
                                 }
                             }
-                                
-
                             DisplayOutputs[thisSurface].Add(sprite.Name, sprite);
                         }
                         else
@@ -173,19 +178,18 @@ namespace IngameScript
         internal void CartesianReader(ref SpriteData sprite, ref Parser myParser, string key, string nametag)
         {
             var coords = myParser.ParseString(nametag, key).Split(',');
-            
-            if (key == SizeKey)
-                if (sprite.spriteType != DrawUtilities.defaultType)
-                {
-                    sprite.SpriteSizeX = float.Parse(coords.First().Trim(l_coord));
-                    sprite.SpriteSizeY = float.Parse(coords.Last().Trim(r_coord));
-                }
 
-                else if (key == PositionKey)
-                {
-                    sprite.SpritePosX = float.Parse(coords.First().Trim(l_coord));
-                    sprite.SpritePosY = float.Parse(coords.Last().Trim(r_coord));
-                }
+            if (key == PositionKey)
+            {
+                sprite.SpritePosX = float.Parse(coords.First().Trim(l_coord));
+                sprite.SpritePosY = float.Parse(coords.Last().Trim(r_coord));
+            }
+
+            else if (key == SizeKey && sprite.spriteType != SharedUtilities.defaultType)
+            {
+                sprite.SpriteSizeX = float.Parse(coords.First().Trim(l_coord));
+                sprite.SpriteSizeY = float.Parse(coords.Last().Trim(r_coord));
+            }
         }
 
         internal void SetKeys() //yes...this is questionable...
@@ -212,17 +216,19 @@ namespace IngameScript
             Parser MyParser = new Parser();
             byte index = 0;          
             MyIniParseResult Result;
-            var freq = DrawUtilities.defaultUpdate;
+            var freq = SharedUtilities.defaultUpdate;
 
             if (MyParser.TryParseCustomData(block, out Result))
             {
                 if (block is IMyTextSurface)
                 {
                     var DisplayBlock = (IMyTextSurface)block;
+                    DisplayOutputs.Add(DisplayBlock, new Dictionary<string, SpriteData>());
+
                     isSingleScreen = true;
                     if (TryAddSprites(ref DisplayBlock, ref MyParser, ref index, out freq))
                     {
-                        DisplayOutputs.Add(DisplayBlock, new Dictionary<string, SpriteData>());
+
                         DisplayRefreshFreqencies.Add(DisplayBlock, freq);
                     }
 
@@ -235,9 +241,9 @@ namespace IngameScript
                     var surface = DisplayBlock.GetSurface(index);
                     while (index <= SurfaceCount - 1)
                     {
+                        DisplayOutputs.Add(surface, new Dictionary<string, SpriteData>());
                         if (TryAddSprites(ref surface, ref MyParser, ref index, out freq))
                         {
-                            DisplayOutputs.Add(surface, new Dictionary<string, SpriteData>());
                             DisplayRefreshFreqencies.Add(surface, freq);
                             ++index;
                         }
@@ -246,12 +252,16 @@ namespace IngameScript
                 
             }
             else throw new Exception($" PARSE FAILURE: {DisplayName} cd error {Result.Error} at {Result.LineNo}");
+            MyParser.Dispose();
 
             foreach (var display in DisplayOutputs)
             {
                 var frame = display.Key.DrawFrame();
                 foreach (var sprite in display.Value)
-                    DrawUtilities.DrawNewSprite(ref frame, sprite.Value);
+                {
+                    DrawNewSprite(ref frame, sprite.Value);
+                    Program.Me.CustomData += sprite.Value.Name + new_line;
+                }                 
                 frame.Dispose();
             }
 
@@ -259,9 +269,54 @@ namespace IngameScript
                 UpdateFrequency |= updateFrequency;
         }
 
+        public static void DrawNewSprite(ref MySpriteDrawFrame frame, SpriteData data)
+        {
+            //this is kind of a retarded setup but it still is shortedr
+            //sprite.Type = data.spriteType;
+            //sprite.Data = data.Data;
+
+            //if (sprite.Type != SharedUtilities.defaultType)
+            //    sprite.Size = new Vector2(data.SpriteSizeY, data.SpriteSizeX);
+
+            //sprite.Alignment = data.SpriteAlignment;
+            //sprite.Position = new Vector2(data.SpritePosX, data.SpritePosY);
+            //sprite.Color = data.SpriteColor;
+
+            //if (sprite.Type == SharedUtilities.defaultType)
+            //    sprite.FontId = data.FontID;
+
+            //sprite.RotationOrScale = data.SpriteRorS;
+            //frame.Add(sprite);
+            var sprite = data.spriteType == SharedUtilities.defaultType ?
+                new MySprite(
+                data.spriteType,
+                data.Data,
+                new Vector2(data.SpritePosX, data.SpritePosY),
+                null,
+                data.SpriteColor,
+                data.FontID,
+                data.SpriteAlignment,
+                data.SpriteRorS
+                )
+                :
+                new MySprite(
+                data.spriteType,
+                data.Data,
+                new Vector2(data.SpritePosX, data.SpritePosY),
+                new Vector2(data.SpritePosX, data.SpritePosY),
+                data.SpriteColor,
+                null,
+                data.SpriteAlignment,
+                data.SpriteRorS
+                    );
+
+            frame.Add(sprite);
+
+        }
+
         public virtual void Update(ref UpdateType sourceFlags)
         {
-            var sourceFreqFlags = UpdateUtilities.UpdateConverter(sourceFlags);
+            var sourceFreqFlags = SharedUtilities.UpdateConverter(sourceFlags);
 
             foreach (var display in DisplayOutputs)
                 if ((DisplayRefreshFreqencies[display.Key] & sourceFreqFlags) != 0) //is display frequency the same as frequency of update source?
@@ -273,7 +328,7 @@ namespace IngameScript
                     var frame = display.Key.DrawFrame();
 
                     foreach (var sprite in display.Value)
-                        DrawUtilities.DrawNewSprite(ref frame, sprite.Value);
+                        DrawNewSprite(ref frame, sprite.Value);
                     frame.Dispose();
                 }
 

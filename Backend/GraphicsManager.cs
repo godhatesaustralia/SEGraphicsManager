@@ -123,10 +123,15 @@ namespace IngameScript
         public void Update(UpdateType source)
         {
             UpdateTimes();
+
+            var sourceflags = SharedUtilities.UpdateConverter(source);
+            
             //intel subsystem(maybe?): DO SOMETHING!!!!
             foreach (LinkedDisplay display in Displays)
-                display.Update(ref source);
-            Program.Echo($"[CYCLE: {Frame}]");
+                if ((display.UpdateFrequency & sourceflags) != 0)
+                    display.Update(ref source);
+                
+            Program.Echo($"<CYCLE: {Frame}>");
         }
 
     }
