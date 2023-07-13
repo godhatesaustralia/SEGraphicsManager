@@ -76,31 +76,36 @@ namespace IngameScript
         // I didn't want the list...but look, it simplifies parsing custom data SO, so much
         // split at '>', trim at '\n'
         //
-        //[SCREEN 0]
-        // >COLOR_BG FA6464FF
-        // >LIST = [FRAME, TOPBAR, ...]
-        //[SPRITE FRAME]
-        // >TYPE {byte 0/2/4} => if this is 2, we can skip size section
-        // >DATA SquareSimple
-        // >SIZE[50, 50]
-        // >ALIGN {byte 0/1/2}
-        // >POSITION[256, 256] => ALWAYS in screen coordinates
-        // >ROTATION/SCALE 0
-        // >COLOR FA6464FF
-        // >FONT don't even LOOK for this if it's a texture
-        // >UPDATE 0x1
-        // >CMD !h2
-        // [SPRITE TOPBAR]
+        //[SECT_SCREEN_0]
+        // K_COLOR_BG FA6464FF
+        // K_LIST = 
+        // |>FRAME
+        //[SECT_SPRITE_FRAME]
+        // K_TYPE {byte 0/2/4} => if this is 2, we can skip size section
+        // K_DATA SquareSimple
+        // K_SIZE[50, 50]
+        // K_ALIGN {byte 0/1/2}
+        // K_COORD (256, 256) => ALWAYS in screen coordinates
+        // K_ROTSCAL 0
+        // K_COLOR FA6464FF
+        // K_FONT don't even LOOK for this if it's a texture
+        // K_UPDATE 0x1
+        // K_CMD !h2
+        // [SECT_SPRITE_TOPBAR]
         //   ...
         // and so on
 
         #endregion
         internal virtual bool TryAddSprites(ref IMyTextSurface thisSurface, ref Parser myParser, ref byte index, out UpdateFrequency screenFrequency)
         {
+            string ScreenSection;
             screenFrequency = SharedUtilities.defaultUpdate;
             var didNotFail = true;
             if (!isSingleScreen)
-                ScreenSection = $"{ScreenSection}_{index}";
+                ScreenSection = $"{this.ScreenSection}_{index}";
+            else
+                ScreenSection = this.ScreenSection;
+            Program.Echo(ScreenSection);
             CommandUsers.Add(thisSurface, new HashSet<string>());
             if (myParser.ContainsSection(ScreenSection))
             {
@@ -146,7 +151,7 @@ namespace IngameScript
                             //Program.Me.CustomData += $"[{sprite.SpriteRorS}]" + new_line;
                             // >FONT
                             if (myParser.ContainsKey(nametag, FontKey))
-                                sprite.FontID = sprite.spriteType == SharedUtilities.defaultType ? myParser.ParseString(nametag, FontKey, "White") : "";
+                                sprite.FontID = sprite.spriteType == SharedUtilities.defaultType ? myParser.ParseString(nametag, FontKey, "Monospace") : "";
                             // >UPDATE
                             if (myParser.ContainsKey(nametag, UpdateKey))
                             {
@@ -241,19 +246,16 @@ namespace IngameScript
                     isSingleScreen = false;
                     var DisplayBlock = (IMyTextSurfaceProvider)block;
                     var SurfaceCount = DisplayBlock.SurfaceCount;
-                    var surface = DisplayBlock.GetSurface(index);
-                    while (index <= SurfaceCount - 1)
+                    
+                    for (index = 0; index < SurfaceCount; ++index)
                     {
+                        var surface = DisplayBlock.GetSurface(index);
                         if (!DisplayOutputs.ContainsKey(surface))
                             DisplayOutputs.Add(surface, new Dictionary<string, SpriteData>());
-                        if (TryAddSprites(ref surface, ref MyParser, ref index, out freq))
-                        {
+                        if (TryAddSprites(ref surface, ref MyParser, ref index, out freq) && DisplayRefreshFreqencies.ContainsKey(surface))     
                             DisplayRefreshFreqencies.Add(surface, freq);
-                            ++index;
-                        }
                     }
-                }
-                
+                }      
             }
             else throw new Exception($" PARSE FAILURE: {DisplayName} cd error {Result.Error} at {Result.LineNo}");
             MyParser.Dispose();
@@ -266,7 +268,7 @@ namespace IngameScript
                 {
                     
                     DrawNewSprite(ref frame, ref piss, sprite.Value);
-                    Program.Me.CustomData += sprite.Value.Name + new_line;
+                    //Program.Me.CustomData += sprite.Value.Name + new_line;
                 }                 
                 frame.Dispose();
             }
@@ -311,9 +313,9 @@ namespace IngameScript
                 data.SpriteColor,
                 null,
                 data.SpriteAlignment,
-                data.SpriteRorS
+                MathHelper.ToRadians(data.SpriteRorS)
                     );
-            Program.Me.CustomData += $"\n{sprite.Type}, \n{sprite.Data}, \n{sprite.Size}, \n{sprite.Position}, \n{sprite.Color}, \n{sprite.Alignment}\n";
+            //Program.Me.CustomData += $"\n{sprite.Type}, \n{sprite.Data}, \n{sprite.Size}, \n{sprite.Position}, \n{sprite.Color}, \n{sprite.Alignment}\n";
             frame.Add(sprite);
 
         }

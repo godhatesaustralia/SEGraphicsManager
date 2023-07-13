@@ -110,6 +110,12 @@ namespace IngameScript
                 var display = new LinkedDisplay(block, ref Commands, ref Program);
                 Displays.Add(display);
                 display.Setup(block);
+                foreach (var surface in display.DisplayOutputs)
+                {
+                    Program.Echo($"SURFACE {surface.Key.DisplayName} LOADED\n");
+                }
+                    
+                    
             }
         }
 
@@ -131,7 +137,8 @@ namespace IngameScript
                 if ((display.UpdateFrequency & sourceflags) != 0)
                     display.Update(ref source);
                 
-            Program.Echo($"<CYCLE: {Frame}>");
+           if (Frame > 1000)
+                Program.Echo($"<CYCLE: {Frame}>");
         }
 
     }

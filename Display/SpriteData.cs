@@ -22,7 +22,7 @@ namespace IngameScript
         public string
             Name,
             Data,
-            FontID,
+            FontID = "DEBUG",
             CommandString;
         public Color SpriteColor;
 

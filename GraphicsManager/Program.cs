@@ -26,7 +26,7 @@ namespace IngameScript
 
         public Program()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            Runtime.UpdateFrequency = UpdateFrequency.Update100;
             Manager = new GraphicsManager(this);
             Manager.Init();
         }
