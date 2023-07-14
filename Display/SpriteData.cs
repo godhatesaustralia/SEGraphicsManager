@@ -46,7 +46,7 @@ namespace IngameScript
             SpriteRorS = ros;
             SpriteColor = color;
             FontID = fontid;
-            CommandFrequency = updateType;
+            CommandFrequency = updateType; //NONE = 0, 1 = 1, 10 = 2, 100 = 3, ONCE = 8
             CommandString = command;     
         }
     }

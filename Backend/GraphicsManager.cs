@@ -41,8 +41,10 @@ namespace IngameScript
 
         public Dictionary<string, Action<SpriteData>> Commands;
         public HashSet<LinkedDisplay> Displays;
+        public List<IMyTerminalBlock> AllBlocks, InventoryBlocks;
         public List<string> IniKeys;
 
+        bool justStarted = true; //shit ass bool for init
         #endregion
 
         public GraphicsManager(MyGridProgram program)
@@ -59,15 +61,57 @@ namespace IngameScript
             });
             Commands = new Dictionary<string, Action<SpriteData>>();
             Displays = new HashSet<LinkedDisplay>();
+            AllBlocks = new List<IMyTerminalBlock>();
             IniKeys = new List<string>(12);
             Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
         }
         
         public void RegisterCommands()
         {
-            Commands.Add("test", (b) =>
+            
+            Commands.Add("!h2%", (b) =>
             {
-
+                if (justStarted) throw new Exception($" {b == null}");
+                var last = b.Data;
+                List<IMyGasTank> tanks = new List<IMyGasTank>();
+                TerminalSystem.GetBlocksOfType(tanks);
+                var amt = 0d;
+                var total = amt;
+                foreach (var tank in tanks)
+                {
+                    amt += tank.FilledRatio * tank.Capacity;
+                    total += tank.Capacity;
+                }
+                var pct = amt / total;
+                b.Data = pct.ToString("#0.##%"); //keep this shrimple for now
+            });
+            Commands.Add("!ammo", (b) =>
+            {
+                MyItemType ammoType = new MyItemType();
+                if (justStarted)
+                {
+                    b.Data = b.Data.Trim();
+                    var ammos = new string[]
+                    {
+                    "AutocannonClip",
+                    "NATO_25x184mm",
+                    "Missile200mm",
+                    "MediumCalibreAmmo",
+                    "LargeCalibreAmmo",
+                    "SmallRailgunAmmo",
+                    "LargeRailgunAmmo"
+                    };
+                    foreach (var ammo in ammos)        
+                        if (b.Data == ammo)
+                            ammoType = new MyItemType("MyObjectBuilder_AmmoMagazine", ammo);
+                    //throw new Exception(" DIE");
+                    //if (ammoType == null) ammoType = MyItemType.MakeAmmo(ammos[1]); this seem return null....
+                    
+                }
+                var amt = 0;
+                foreach (var block in AllBlocks)
+                    SharedUtilities.TryGetItem(block, ammoType, ref amt);
+                b.Data = amt.ToString();
             });
         }
 
@@ -91,7 +135,7 @@ namespace IngameScript
 
         public void Init()
         {
-
+            TerminalSystem.GetBlocksOfType(AllBlocks);
             RegisterCommands();
             //var section = "KEYS";
             //Parser myParser = new Parser();
@@ -113,10 +157,9 @@ namespace IngameScript
                 foreach (var surface in display.DisplayOutputs)
                 {
                     Program.Echo($"SURFACE {surface.Key.DisplayName} LOADED\n");
-                }
-                    
-                    
+                }      
             }
+            justStarted = false;
         }
 
         void UpdateTimes()
