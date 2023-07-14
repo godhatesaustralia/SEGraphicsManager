@@ -35,31 +35,13 @@ namespace IngameScript
         public Dictionary<string, Action<SpriteData>> Commands;
         public Dictionary<IMyTextSurface, HashSet<string>> CommandUsers;
         public Dictionary<IMyTextSurface, UpdateFrequency> DisplayRefreshFreqencies;
-        public string
-            DisplayName,
-            ScreenSection,
-            SpriteSection,
-            ListKey,
-            TypeKey,
-            DataKey,
-            SizeKey,
-            AlignKey,
-            PositionKey,
-            RotationScaleKey,
-            ColorKey,
-            FontKey,
-            CommandKey,
-            UpdateKey;
-        internal char
-            l_coord = '(',
-            r_coord = ')',
-            new_line = '\n',
-            new_entry = '>';
+        internal DisplayIniKeys Keys;
+        public string DisplayName;
         bool isSingleScreen;
 
         #endregion
 
-        public LinkedDisplay(IMyTerminalBlock block, ref Dictionary<string, Action<SpriteData>> commandsDict, ref MyGridProgram program)
+        public LinkedDisplay(IMyTerminalBlock block, ref Dictionary<string, Action<SpriteData>> commandsDict, ref MyGridProgram program, ref DisplayIniKeys keys)
         {
             Commands = commandsDict;
             CommandUsers = new Dictionary<IMyTextSurface, HashSet<string>>();
@@ -67,6 +49,7 @@ namespace IngameScript
             DisplayOutputs = new Dictionary<IMyTextSurface, Dictionary<string, SpriteData>>();
             DisplayName = block.CustomName;
             Program = program;
+            Keys = keys;
         }
 
         #region CustomDataFormat
@@ -81,16 +64,19 @@ namespace IngameScript
         // K_LIST = 
         // |>FRAME
         //[SECT_SPRITE_FRAME]
-        // K_TYPE {byte 0/2/4} => if this is 2, we can skip size section
-        // K_DATA SquareSimple
-        // K_SIZE[50, 50]
-        // K_ALIGN {byte 0/1/2}
-        // K_COORD (256, 256) => ALWAYS in screen coordinates
-        // K_ROTSCAL 0
-        // K_COLOR FA6464FF
-        // K_FONT don't even LOOK for this if it's a texture
-        // K_UPDATE 0x1
-        // K_CMD !h2
+        // K_TYPE = {byte 0/2/4} => if this is 2, we can skip size section
+        // K_DATA = SquareSimple
+        // K_SIZE = (50, 50)
+        // K_ALIGN = 2 => {byte 0/1/2}
+        // K_COORD = (256, 256) => ALWAYS in screen coordinates
+        // K_ROTSCAL = 0
+        // K_COLOR = FA6464FF
+        // K_FONT = "White" => don't even LOOK for this if it's a texture
+        // K_UPDATE = 0x1
+        // K_CMD = !...
+        // K_BUILD = false
+        // K_PREP = default
+        // K_APP = default
         // [SECT_SPRITE_TOPBAR]
         //   ...
         // and so on
@@ -102,26 +88,26 @@ namespace IngameScript
             screenFrequency = SharedUtilities.defaultUpdate;
             var didNotFail = true;
             if (!isSingleScreen)
-                ScreenSection = $"{this.ScreenSection}_{index}";
+                ScreenSection = $"{Keys.ScreenSection}_{index}";
             else
-                ScreenSection = this.ScreenSection;
+                ScreenSection = Keys.ScreenSection;
             Program.Echo(ScreenSection);
             CommandUsers.Add(thisSurface, new HashSet<string>());
             if (myParser.ContainsSection(ScreenSection))
             {
                 thisSurface.ContentType = ContentType.SCRIPT;
                 thisSurface.Script = "";
-                thisSurface.ScriptBackgroundColor = myParser.ParseColor(ScreenSection, ColorKey + "_BG");
-                var names = myParser.ParseString(ScreenSection, ListKey);
-                var namesArray = names.Split(new_line);
+                thisSurface.ScriptBackgroundColor = myParser.ParseColor(ScreenSection, Keys.ColorKey + "_BG");
+                var names = myParser.ParseString(ScreenSection, Keys.ListKey);
+                var namesArray = names.Split(Keys.new_line);
                 for (int i = 0; i < namesArray.Length; ++i)
-                { namesArray[i] = namesArray[i].Trim(new_entry); namesArray[i] = namesArray[i].Trim(); Program.Echo(namesArray[i]); }
+                { namesArray[i] = namesArray[i].Trim(Keys.new_entry); namesArray[i] = namesArray[i].Trim(); Program.Echo(namesArray[i]); }
 
                 if (namesArray.Count() > 0)
                     foreach (var name in namesArray)
                     {
                         
-                        var nametag = $"{SpriteSection}_{name}";
+                        var nametag = $"{Keys.SpriteSection}_{name}";
 
                         if (myParser.ContainsSection(nametag) && namesArray.Contains(name))
                         {
@@ -130,48 +116,60 @@ namespace IngameScript
                             sprite.Name = name;
                             //Program.Me.CustomData += sprite.Name + new_line;
                             // >TYPE
-                            sprite.spriteType = (SpriteType)myParser.ParseByte(nametag, TypeKey);
+                            sprite.spriteType = (SpriteType)myParser.ParseByte(nametag, Keys.TypeKey);
                             //Program.Me.CustomData += sprite.spriteType.ToString() + new_line;
                             // >DATA
-                            sprite.Data = myParser.ParseString(nametag, DataKey, "FAILED");
+                            sprite.Data = myParser.ParseString(nametag, Keys.DataKey, "FAILED");
                             //Program.Me.CustomData += sprite.Data + new_line;
                             // >SIZE
-                            CartesianReader(ref sprite, ref myParser, SizeKey, nametag);
+                            CartesianReader(ref sprite, ref myParser, Keys.SizeKey, nametag);
                             //Program.Me.CustomData += $"[{sprite.SpriteSizeX}, {sprite.SpriteSizeY}]" + new_line;
                             // >ALIGN
-                            sprite.SpriteAlignment = (TextAlignment)myParser.ParseByte(nametag, AlignKey);
+                            sprite.SpriteAlignment = (TextAlignment)myParser.ParseByte(nametag, Keys.AlignKey);
                             //Program.Me.CustomData += sprite.SpriteAlignment.ToString() + new_line;
                             // >POSITION
-                            CartesianReader(ref sprite, ref myParser, PositionKey, nametag);
+                            CartesianReader(ref sprite, ref myParser, Keys.PositionKey, nametag);
                             //Program.Me.CustomData += $"[{sprite.SpritePosX}, {sprite.SpritePosY}]" + new_line;
                             //COLOR
-                            sprite.SpriteColor = myParser.ParseColor(nametag, ColorKey);
+                            sprite.SpriteColor = myParser.ParseColor(nametag, Keys.ColorKey);
                             // >ROTATION/SCALE
-                            sprite.SpriteRorS = myParser.ParseFloat(nametag, RotationScaleKey);
+                            sprite.SpriteRorS = myParser.ParseFloat(nametag, Keys.RotationScaleKey);
                             //Program.Me.CustomData += $"[{sprite.SpriteRorS}]" + new_line;
                             // >FONT
-                            if (myParser.ContainsKey(nametag, FontKey))
-                                sprite.FontID = sprite.spriteType == SharedUtilities.defaultType ? myParser.ParseString(nametag, FontKey, "Monospace") : "";
+                            if (myParser.ContainsKey(nametag, Keys.FontKey))
+                                sprite.FontID = sprite.spriteType == SharedUtilities.defaultType ? myParser.ParseString(nametag, Keys.FontKey, "Monospace") : "";
                             // >UPDATE
-                            if (myParser.ContainsKey(nametag, UpdateKey))
+                            if (myParser.ContainsKey(nametag, Keys.UpdateKey))
                             {
-                                sprite.CommandFrequency = (UpdateFrequency)myParser.ParseByte(nametag, UpdateKey, 0);
+                                sprite.CommandFrequency = (UpdateFrequency)myParser.ParseByte(nametag, Keys.UpdateKey, 0);
                                 screenFrequency |= sprite.CommandFrequency;
                             }
                             else
                                 sprite.CommandFrequency = SharedUtilities.defaultUpdate;
                             
                             // >COMMAND
-                            if (myParser.ContainsKey(nametag, CommandKey))
+                            if (myParser.ContainsKey(nametag, Keys.CommandKey))
                             {
                                 if (sprite.CommandFrequency != SharedUtilities.defaultUpdate && sprite.CommandString != "")
                                 {
-                                    sprite.CommandString = sprite.CommandFrequency == SharedUtilities.defaultUpdate ? "" : myParser.ParseString(nametag, CommandKey, "!def");
+                                    // >USEBUILDER
+                                    if (myParser.ContainsKey(nametag, Keys.BuilderKey))
+                                        sprite.UseStringBuilder = myParser.ParseBool(nametag, Keys.BuilderKey);
+                                    // >PREPEND
+                                    if (sprite.UseStringBuilder && myParser.ContainsKey(nametag, Keys.PrependKey))
+                                        sprite.BuilderPrepend = myParser.ParseString(nametag, Keys.PrependKey);
+                                    // >APPEND
+                                    if (sprite.UseStringBuilder && myParser.ContainsKey(nametag, Keys.AppendKey))
+                                        sprite.BuilderAppend = myParser.ParseString(nametag, Keys.AppendKey);
+
+                                    sprite.CommandString = sprite.CommandFrequency == SharedUtilities.defaultUpdate ? "" : myParser.ParseString(nametag, Keys.CommandKey, "!def");
                                     CommandUsers[thisSurface].Add(sprite.Name);
                                     sprite.Command = Commands[sprite.CommandString];
                                     sprite.Command.Invoke(sprite);
                                 }
                             }
+
+                            // We're done!
                             if (!DisplayOutputs[thisSurface].ContainsKey(sprite.Name))
                                 DisplayOutputs[thisSurface].Add(sprite.Name, sprite);
                         }
@@ -187,40 +185,22 @@ namespace IngameScript
         {
             var coords = myParser.ParseString(nametag, key).Split(',');
 
-            if (key == PositionKey)
+            if (key == Keys.PositionKey)
             {
-                sprite.SpritePosX = float.Parse(coords.First().Trim(l_coord));
-                sprite.SpritePosY = float.Parse(coords.Last().Trim(r_coord));
+                sprite.SpritePosX = float.Parse(coords.First().Trim(Keys.l_coord));
+                sprite.SpritePosY = float.Parse(coords.Last().Trim(Keys.r_coord));
             }
 
-            else if (key == SizeKey && sprite.spriteType != SharedUtilities.defaultType)
+            else if (key == Keys.SizeKey && sprite.spriteType != SharedUtilities.defaultType)
             {
-                sprite.SpriteSizeX = float.Parse(coords.First().Trim(l_coord));
-                sprite.SpriteSizeY = float.Parse(coords.Last().Trim(r_coord));
+                sprite.SpriteSizeX = float.Parse(coords.First().Trim(Keys.l_coord));
+                sprite.SpriteSizeY = float.Parse(coords.Last().Trim(Keys.r_coord));
             }
-        }
-
-        internal void SetKeys() //yes...this is questionable...
-        {
-            ScreenSection = "SECT_SCREEN";
-            SpriteSection = "SECT_SPRITE";
-            ListKey = "K_LIST";
-            TypeKey = "K_TYPE";
-            DataKey = "K_DATA";
-            SizeKey = "K_SIZE";
-            AlignKey = "K_ALIGN";
-            PositionKey = "K_COORD";
-            RotationScaleKey = "K_ROTSCAL";
-            ColorKey = "K_COLOR";
-            FontKey = "K_FONT";
-            CommandKey = "K_CMD";
-            UpdateKey = "K_UPDT";
         }
 
         public virtual void Setup<T>(T block)
             where T : IMyTerminalBlock
         {
-            SetKeys();
             Parser MyParser = new Parser();
             byte index = 0;          
             MyIniParseResult Result;
@@ -242,7 +222,6 @@ namespace IngameScript
                 }
                 else if (block is IMyTextSurfaceProvider)
                 {
-                    //TODO: I fucked up here somewhere...
                     isSingleScreen = false;
                     var DisplayBlock = (IMyTextSurfaceProvider)block;
                     var SurfaceCount = DisplayBlock.SurfaceCount;
@@ -252,8 +231,9 @@ namespace IngameScript
                         var surface = DisplayBlock.GetSurface(index);
                         if (!DisplayOutputs.ContainsKey(surface))
                             DisplayOutputs.Add(surface, new Dictionary<string, SpriteData>());
-                        if (TryAddSprites(ref surface, ref MyParser, ref index, out freq) && DisplayRefreshFreqencies.ContainsKey(surface))     
+                        if (TryAddSprites(ref surface, ref MyParser, ref index, out freq)/* && DisplayRefreshFreqencies.ContainsKey(surface) WHAT TEH FUCK WHY DID I DO THIS*/)
                             DisplayRefreshFreqencies.Add(surface, freq);
+                        else DisplayRefreshFreqencies.Add(surface, SharedUtilities.defaultUpdate);
                     }
                 }      
             }
@@ -274,27 +254,17 @@ namespace IngameScript
             }
 
             foreach (var updateFrequency in DisplayRefreshFreqencies.Values)
+            {
+                Program.Echo($"{UpdateFrequency} |= {updateFrequency}");
                 UpdateFrequency |= updateFrequency;
+                Program.Echo($"{UpdateFrequency}");
+            }
+                
+                
         }
 
         public void DrawNewSprite(ref MySpriteDrawFrame frame, ref Vector2 center, SpriteData data)
         {
-            //this is kind of a retarded setup but it still is shortedr
-            //sprite.Type = data.spriteType;
-            //sprite.Data = data.Data;
-
-            //if (sprite.Type != SharedUtilities.defaultType)
-            //    sprite.Size = new Vector2(data.SpriteSizeY, data.SpriteSizeX);
-
-            //sprite.Alignment = data.SpriteAlignment;
-            //sprite.Position = new Vector2(data.SpritePosX, data.SpritePosY);
-            //sprite.Color = data.SpriteColor;
-
-            //if (sprite.Type == SharedUtilities.defaultType)
-            //    sprite.FontId = data.FontID;
-
-            //sprite.RotationOrScale = data.SpriteRorS;
-            //frame.Add(sprite);
             var sprite = data.spriteType == SharedUtilities.defaultType ? new MySprite(
                 data.spriteType,
                 data.Data,
@@ -327,10 +297,10 @@ namespace IngameScript
             foreach (var display in DisplayOutputs)
                 if ((DisplayRefreshFreqencies[display.Key] & sourceFreqFlags) != 0) //is display frequency the same as frequency of update source?
                 {                                                                   // i.e. do we update display on this tick
+                    Program.Me.CustomData += $"UPDATED {display}, {Program.Runtime.TimeSinceLastRun}\n";
                     foreach (var name in display.Value.Keys)
                         if (CommandUsers[display.Key].Contains(name) && (display.Value[name].CommandFrequency & sourceFreqFlags) != 0) //is command frequency the same as frequency of update source?
                             display.Value[name].Command.Invoke(display.Value[name]);                                                   //i.e. do we run command on this tick
-
                     var frame = display.Key.DrawFrame();
                     var piss = display.Key.TextureSize * 0.5f;
                     foreach (var sprite in display.Value)

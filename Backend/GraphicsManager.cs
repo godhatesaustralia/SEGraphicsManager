@@ -42,7 +42,16 @@ namespace IngameScript
         public Dictionary<string, Action<SpriteData>> Commands;
         public HashSet<LinkedDisplay> Displays;
         public List<IMyTerminalBlock> AllBlocks, InventoryBlocks;
-        public List<string> IniKeys;
+        public DisplayIniKeys Keys;
+
+        internal const string
+            myObjectBuilderString = "MyObjectBuilder";
+        internal const char
+            commandSplit = '$',
+            space = ' ';
+        internal StringBuilder Builder;
+        
+
 
         bool justStarted = true; //shit ass bool for init
         #endregion
@@ -62,16 +71,18 @@ namespace IngameScript
             Commands = new Dictionary<string, Action<SpriteData>>();
             Displays = new HashSet<LinkedDisplay>();
             AllBlocks = new List<IMyTerminalBlock>();
-            IniKeys = new List<string>(12);
+            Keys = new DisplayIniKeys();
+            Builder = new StringBuilder();
             Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
         }
-        
+        // SO...command formatting. Depends on the general command, but here's the idea
+        // this is all for the K_DATA field of the sprite.
+        // <required param 1>$<required param 2>$...$<required param n>
         public void RegisterCommands()
         {
             
             Commands.Add("!h2%", (b) =>
             {
-                if (justStarted) throw new Exception($" {b == null}");
                 var last = b.Data;
                 List<IMyGasTank> tanks = new List<IMyGasTank>();
                 TerminalSystem.GetBlocksOfType(tanks);
@@ -85,8 +96,10 @@ namespace IngameScript
                 var pct = amt / total;
                 b.Data = pct.ToString("#0.##%"); //keep this shrimple for now
             });
+
             Commands.Add("!ammo", (b) =>
             {
+                var amt = 0;
                 MyItemType ammoType = new MyItemType();
                 if (justStarted)
                 {
@@ -103,14 +116,38 @@ namespace IngameScript
                     };
                     foreach (var ammo in ammos)        
                         if (b.Data == ammo)
-                            ammoType = new MyItemType("MyObjectBuilder_AmmoMagazine", ammo);
+                            ammoType = new MyItemType($"{myObjectBuilderString}_AmmoMagazine", ammo);
                     //throw new Exception(" DIE");
                     //if (ammoType == null) ammoType = MyItemType.MakeAmmo(ammos[1]); this seem return null....
                     
-                }
-                var amt = 0;
+                }  
                 foreach (var block in AllBlocks)
                     SharedUtilities.TryGetItem(block, ammoType, ref amt);
+                b.Data = amt.ToString();
+
+                if (!b.UseStringBuilder)      
+                    return;
+                
+                if (b.BuilderPrepend.Length > 0)
+                    b.Data = $"{b.BuilderPrepend} {b.Data}";
+
+                if (b.BuilderAppend.Length > 0)
+                    b.Data = $"{b.Data} {b.BuilderAppend}";
+            });
+
+            Commands.Add("!item", (b) =>
+            {
+                var amt = 0;
+                MyItemType itemType = new MyItemType();
+                if (justStarted)
+                    if (b.Data.Contains(commandSplit))
+                    {
+                       b.Data = b.Data.Trim();
+                       var stringParts = b.Data.Split(commandSplit);
+                       itemType = new MyItemType($"{myObjectBuilderString}_{stringParts[0]}", stringParts[1]);
+                    }
+                foreach (var block in AllBlocks)
+                    SharedUtilities.TryGetItem(block, itemType, ref amt);
                 b.Data = amt.ToString();
             });
         }
@@ -135,28 +172,22 @@ namespace IngameScript
 
         public void Init()
         {
+            Keys.ResetKeys(); // lol. lmao
             TerminalSystem.GetBlocksOfType(AllBlocks);
+            TerminalSystem.GetBlocksOfType(InventoryBlocks, (b) => b.HasInventory);//WHY ISN'T IT POSSIBLE
             RegisterCommands();
-            //var section = "KEYS";
-            //Parser myParser = new Parser();
-            //MyIniParseResult Result;
-            //if (myParser.TryParseCustomData(Me, out Result))
-            //    if (myParser.ContainsSection(section))
-            //    {
-
-            //    }
-            //else throw new Exception($" KEY PARSE FAILURE: {Result.Error} at {Result.LineNo}");
             
             List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
             TerminalSystem.GetBlockGroupWithName("LCT Screen Control").GetBlocks(blocks);
             foreach (var block in blocks)
             {
-                var display = new LinkedDisplay(block, ref Commands, ref Program);
+                var display = new LinkedDisplay(block, ref Commands, ref Program, ref Keys);
                 Displays.Add(display);
                 display.Setup(block);
                 foreach (var surface in display.DisplayOutputs)
                 {
                     Program.Echo($"SURFACE {surface.Key.DisplayName} LOADED\n");
+                    Program.Echo($"SURFACE UPDATE {display.DisplayRefreshFreqencies[surface.Key]}");
                 }      
             }
             justStarted = false;

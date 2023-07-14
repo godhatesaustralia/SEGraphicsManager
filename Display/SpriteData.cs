@@ -22,18 +22,27 @@ namespace IngameScript
         public string
             Name,
             Data,
-            FontID = "DEBUG",
-            CommandString;
+            FontID = "VCRBold",
+            CommandString,
+            BuilderPrepend,
+            BuilderAppend;
         public Color SpriteColor;
+        public bool
+            UseStringBuilder, //for commands, whether to apply stringbuilder (and to attempt parse of stringbuilder param)
+            newData = false;
 
         #endregion
 
         public SpriteData()
         {
             spriteType = SharedUtilities.defaultType;
+            CommandFrequency = SharedUtilities.defaultUpdate;
+            Command = null;
+            UseStringBuilder = false;
+            BuilderPrepend = BuilderAppend = "";
         }
 
-        public SpriteData(SpriteType type, string name, string data, float sizeX, float sizeY, TextAlignment alignment, float posX, float posY, float ros, Color color, string fontid = "White", UpdateFrequency updateType = UpdateFrequency.None, string command = "")
+        public SpriteData(SpriteType type, string name, string data, float sizeX, float sizeY, TextAlignment alignment, float posX, float posY, float ros, Color color, string fontid = "White", UpdateFrequency updateType = UpdateFrequency.None, string command = "", bool builder = false, string prepend = "")
         {
             spriteType = type;
             Name = name;    
@@ -47,7 +56,9 @@ namespace IngameScript
             SpriteColor = color;
             FontID = fontid;
             CommandFrequency = updateType; //NONE = 0, 1 = 1, 10 = 2, 100 = 3, ONCE = 8
-            CommandString = command;     
+            CommandString = command;
+            UseStringBuilder = builder;
+            BuilderPrepend = prepend;
         }
     }
 }

@@ -69,10 +69,12 @@ namespace IngameScript
         {
             return myIni.Get(aSection, aKey).ToString(aDefault);
         }
-        public Color ParseColor(string aSection, string aKey, string aDefault = "FA3232FF")
+        public Color ParseColor(string aSection, string aKey, string aDefault = "")
         {
             byte r, g, b, a;
             aDefault = myIni.Get(aSection, aKey).ToString(aDefault);
+            if (aDefault.Length != 8) 
+                return SharedUtilities.defaultColor; //safety
             r = HexParse(aDefault, 0, 2);
             g = HexParse(aDefault, 2, 2);
             b = HexParse(aDefault, 4, 2);
