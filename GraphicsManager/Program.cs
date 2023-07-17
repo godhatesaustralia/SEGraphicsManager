@@ -33,7 +33,7 @@ namespace IngameScript
 
         public void Main(string argument, UpdateType updateSource)
         {
-            Manager.Update(updateSource);
+            Manager.Update(argument, updateSource);
         }
     }
 }

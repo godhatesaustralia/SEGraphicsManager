@@ -35,12 +35,12 @@ namespace IngameScript
         public IMyShipController Controller;
 
         public long
-        Frame = 0,
-        RuntimeMSRounded = 0;
-        public double RuntimeMS = 0;
+        Frame,
+        RuntimeMSRounded;
+        public double RuntimeMS;
 
         public Dictionary<string, Action<SpriteData>> Commands;
-        public Dictionary<long, MyItemType> ItemStorage;
+        public Dictionary<long, MyItemType[]> ItemStorage;
         public HashSet<LinkedDisplay> Displays;
         public List<IMyTerminalBlock> AllBlocks, InventoryBlocks;
         public DisplayIniKeys Keys;
@@ -50,6 +50,16 @@ namespace IngameScript
         internal const char
             commandSplit = '$',
             space = ' ';
+        internal string[] ammoNames = new string[]
+        {
+            "ACN",
+            "GAT",
+            "RKT",
+            "ASL",
+            "ART",
+            "SRG",
+            "LRG"
+        };
         internal StringBuilder Builder;
         
 
@@ -70,13 +80,24 @@ namespace IngameScript
                 return true;
             });
             Commands = new Dictionary<string, Action<SpriteData>>();
-            ItemStorage = new Dictionary<long, MyItemType>();
+            ItemStorage = new Dictionary<long, MyItemType[]>();
             Displays = new HashSet<LinkedDisplay>();
             AllBlocks = new List<IMyTerminalBlock>();
+            InventoryBlocks = new List<IMyTerminalBlock>();
             Keys = new DisplayIniKeys();
             Builder = new StringBuilder();
             Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
         }
+
+        public void Clear()
+        {
+            Commands.Clear();
+            ItemStorage.Clear();
+            Displays.Clear();
+            AllBlocks.Clear();
+            InventoryBlocks.Clear();
+        }
+
         // SO...command formatting. Depends on the general command, but here's the idea
         // this is all for the K_DATA field of the sprite.
         // <required param 1>$<required param 2>$...$<required param n>
@@ -116,15 +137,15 @@ namespace IngameScript
                     "SmallRailgunAmmo",
                     "LargeRailgunAmmo"
                     };
-                    foreach (var ammo in ammos)        
+                    foreach (var ammo in ammos)
                         if (b.Data == ammo)
-                            ItemStorage.Add(b.UniqueID, new MyItemType($"{myObjectBuilderString}_AmmoMagazine", ammo));
+                            ItemStorage.Add(b.UniqueID, new MyItemType[] { new MyItemType($"{myObjectBuilderString}_AmmoMagazine", ammo) });
                     //throw new Exception(" DIE");
                     //if (ammoType == null) ammoType = MyItemType.MakeAmmo(ammos[1]); this seem return null....
                     
                 }  
-                foreach (var block in AllBlocks)
-                    SharedUtilities.TryGetItem(block, ItemStorage[b.UniqueID], ref amt);
+                foreach (var block in InventoryBlocks)
+                    SharedUtilities.TryGetItem(block, ItemStorage[b.UniqueID][0], ref amt);
                 b.Data = amt.ToString();
 
                 if (!b.UseStringBuilder)      
@@ -135,7 +156,46 @@ namespace IngameScript
 
                 if (b.BuilderAppend.Length > 0)
                     b.Data = $"{b.Data} {b.BuilderAppend}";
-            });z
+            });
+
+            Commands.Add("!ammos", (b) =>
+            {
+                if (!b.UseStringBuilder)
+                    return;
+
+                if (justStarted)
+                {
+                    var ammos = new string[]
+                    {
+                    "AutocannonClip",
+                    "NATO_25x184mm",
+                    "Missile200mm",
+                    "MediumCalibreAmmo",
+                    "LargeCalibreAmmo",
+                    "SmallRailgunAmmo",
+                    "LargeRailgunAmmo"
+                    };
+                    ItemStorage.Add(b.UniqueID, new MyItemType[7]);
+                    for (int i = 0; i < 6; ++i) //it's okay!! becausawe im drunk
+                            ItemStorage[b.UniqueID][i] = new MyItemType($"{myObjectBuilderString}_AmmoMagazine", ammos[i]);
+                }
+                for (int i = 0; i < 6; ++i)
+                {
+                    var amt = 0;
+                    foreach (var block in InventoryBlocks)
+                    {
+                        SharedUtilities.TryGetItem(block, ItemStorage[b.UniqueID][i], ref amt);
+                    }
+                        
+                    if (amt > 0)
+                    {
+                        var data = amt.ToString();
+                        Builder.AppendLine($"{ammoNames[i]} {data} {b.BuilderAppend}");
+                    }
+                }
+
+                b.Data = Builder.ToString();
+            });
 
             Commands.Add("!item", (b) =>
             {
@@ -148,7 +208,7 @@ namespace IngameScript
                        var stringParts = b.Data.Split(commandSplit);
                        itemType = new MyItemType($"{myObjectBuilderString}_{stringParts[0]}", stringParts[1]);
                     }
-                foreach (var block in AllBlocks)
+                foreach (var block in InventoryBlocks)
                     SharedUtilities.TryGetItem(block, itemType, ref amt);
                 b.Data = amt.ToString();
             });
@@ -156,9 +216,13 @@ namespace IngameScript
 
         public void Init()
         {
+            Clear();
+            Frame = 0;
+            RuntimeMSRounded = 0;
+            RuntimeMS = 0;
             Keys.ResetKeys(); // lol. lmao
             TerminalSystem.GetBlocksOfType(AllBlocks);
-            //TerminalSystem.GetBlocksOfType(InventoryBlocks, (b) => b.HasInventory);//WHY ISN'T IT POSSIBLE
+            TerminalSystem.GetBlocksOfType(InventoryBlocks, (b) => b.HasInventory);//WHY ISN'T IT POSSIBLE
             RegisterCommands();
             
             List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
@@ -184,10 +248,21 @@ namespace IngameScript
             Frame++;
         }
 
-        public void Update(UpdateType source)
+        public void Update(string arg, UpdateType source)
         {
             UpdateTimes();
-
+            if (arg != "")
+            {
+                switch (arg)
+                {
+                    case "reset":
+                        {
+                            Init();
+                            break;
+                        }
+                    default: { break; }
+                }
+            }
             var sourceflags = SharedUtilities.UpdateConverter(source);
             var targetflags = (UpdateFrequency)1;
             //intel subsystem(maybe?): DO SOMETHING!!!!

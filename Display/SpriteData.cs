@@ -23,7 +23,7 @@ namespace IngameScript
         public string
             Name,
             Data,
-            FontID = "VCRBold",
+            FontID = "DEBUG",
             CommandString,
             BuilderPrepend,
             BuilderAppend;

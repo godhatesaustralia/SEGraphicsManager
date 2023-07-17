@@ -205,12 +205,10 @@ namespace IngameScript
             where T : IMyEntity
         {
             var initial = total;
-            if (!block.HasInventory)
-                return false;
-            else if (block.HasInventory)
+            if (block.HasInventory)
             {
                 var inventory = block.GetInventory();
-                if (!inventory.ContainItems(0, itemType)) 
+                if (!inventory.ContainItems(1, itemType)) 
                     return false;
                 total += inventory.GetItemAmount(itemType).ToIntSafe();
             }
