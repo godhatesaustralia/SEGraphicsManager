@@ -40,6 +40,7 @@ namespace IngameScript
         public double RuntimeMS = 0;
 
         public Dictionary<string, Action<SpriteData>> Commands;
+        public Dictionary<long, MyItemType> ItemStorage;
         public HashSet<LinkedDisplay> Displays;
         public List<IMyTerminalBlock> AllBlocks, InventoryBlocks;
         public DisplayIniKeys Keys;
@@ -69,6 +70,7 @@ namespace IngameScript
                 return true;
             });
             Commands = new Dictionary<string, Action<SpriteData>>();
+            ItemStorage = new Dictionary<long, MyItemType>();
             Displays = new HashSet<LinkedDisplay>();
             AllBlocks = new List<IMyTerminalBlock>();
             Keys = new DisplayIniKeys();
@@ -100,7 +102,7 @@ namespace IngameScript
             Commands.Add("!ammo", (b) =>
             {
                 var amt = 0;
-                MyItemType ammoType = new MyItemType();
+               
                 if (justStarted)
                 {
                     b.Data = b.Data.Trim();
@@ -116,13 +118,13 @@ namespace IngameScript
                     };
                     foreach (var ammo in ammos)        
                         if (b.Data == ammo)
-                            ammoType = new MyItemType($"{myObjectBuilderString}_AmmoMagazine", ammo);
+                            ItemStorage.Add(b.UniqueID, new MyItemType($"{myObjectBuilderString}_AmmoMagazine", ammo));
                     //throw new Exception(" DIE");
                     //if (ammoType == null) ammoType = MyItemType.MakeAmmo(ammos[1]); this seem return null....
                     
                 }  
                 foreach (var block in AllBlocks)
-                    SharedUtilities.TryGetItem(block, ammoType, ref amt);
+                    SharedUtilities.TryGetItem(block, ItemStorage[b.UniqueID], ref amt);
                 b.Data = amt.ToString();
 
                 if (!b.UseStringBuilder)      
@@ -133,7 +135,7 @@ namespace IngameScript
 
                 if (b.BuilderAppend.Length > 0)
                     b.Data = $"{b.Data} {b.BuilderAppend}";
-            });
+            });z
 
             Commands.Add("!item", (b) =>
             {
@@ -152,29 +154,11 @@ namespace IngameScript
             });
         }
 
-        #region CustomDataFormat
-
-        // [KEYS]
-        // K0 = [SCREEN 
-        // K1 = [SPRITE 
-        // K2 = >LIST 
-        // K3 = >TYPE
-        // K4 = >DATA
-        // K5 = >SIZE
-        // K6 = >ALIGN
-        // K7 = >POSITION 
-        // K8 = >ROTATION/SCALE
-        // K9 = >COLOR 
-        // K10 = >FONT 
-        // K11 = >UPDATE
-
-        #endregion
-
         public void Init()
         {
             Keys.ResetKeys(); // lol. lmao
             TerminalSystem.GetBlocksOfType(AllBlocks);
-            TerminalSystem.GetBlocksOfType(InventoryBlocks, (b) => b.HasInventory);//WHY ISN'T IT POSSIBLE
+            //TerminalSystem.GetBlocksOfType(InventoryBlocks, (b) => b.HasInventory);//WHY ISN'T IT POSSIBLE
             RegisterCommands();
             
             List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
@@ -205,14 +189,24 @@ namespace IngameScript
             UpdateTimes();
 
             var sourceflags = SharedUtilities.UpdateConverter(source);
-            
+            var targetflags = (UpdateFrequency)1;
             //intel subsystem(maybe?): DO SOMETHING!!!!
             foreach (LinkedDisplay display in Displays)
+            {
                 if ((display.UpdateFrequency & sourceflags) != 0)
                     display.Update(ref source);
+                targetflags |= display.UpdateFrequency;
+            }
+
+            Program.Runtime.UpdateFrequency = targetflags;
                 
            if (Frame > 1000)
+            {
                 Program.Echo($"<CYCLE: {Frame}>");
+                Program.Echo($"<SOURCE: {source}>");
+            }
+                
+           
         }
 
     }

@@ -37,6 +37,7 @@ namespace IngameScript
         public Dictionary<IMyTextSurface, UpdateFrequency> DisplayRefreshFreqencies;
         internal DisplayIniKeys Keys;
         public string DisplayName;
+        public long DisplayID;
         bool isSingleScreen;
 
         #endregion
@@ -48,6 +49,7 @@ namespace IngameScript
             DisplayRefreshFreqencies = new Dictionary<IMyTextSurface, UpdateFrequency>();
             DisplayOutputs = new Dictionary<IMyTextSurface, Dictionary<string, SpriteData>>();
             DisplayName = block.CustomName;
+            DisplayID = block.EntityId;
             Program = program;
             Keys = keys;
         }
@@ -111,6 +113,7 @@ namespace IngameScript
 
                         if (myParser.ContainsSection(nametag) && namesArray.Contains(name))
                         {
+
                             SpriteData sprite = new SpriteData();
                             //Name
                             sprite.Name = name;
@@ -148,10 +151,12 @@ namespace IngameScript
                                 sprite.CommandFrequency = SharedUtilities.defaultUpdate;
                             
                             // >COMMAND
-                            if (myParser.ContainsKey(nametag, Keys.CommandKey))
+                            if (myParser.ContainsKey(nametag, Keys.CommandKey) && sprite.CommandFrequency != 0)
                             {
                                 if (sprite.CommandFrequency != SharedUtilities.defaultUpdate && sprite.CommandString != "")
                                 {
+                                    // UniqueID
+                                    sprite.UniqueID = DisplayID + index + Array.IndexOf(namesArray, name);
                                     // >USEBUILDER
                                     if (myParser.ContainsKey(nametag, Keys.BuilderKey))
                                         sprite.UseStringBuilder = myParser.ParseBool(nametag, Keys.BuilderKey);
@@ -293,7 +298,6 @@ namespace IngameScript
         public virtual void Update(ref UpdateType sourceFlags)
         {
             var sourceFreqFlags = SharedUtilities.UpdateConverter(sourceFlags);
-
             foreach (var display in DisplayOutputs)
                 if ((DisplayRefreshFreqencies[display.Key] & sourceFreqFlags) != 0) //is display frequency the same as frequency of update source?
                 {                                                                   // i.e. do we update display on this tick

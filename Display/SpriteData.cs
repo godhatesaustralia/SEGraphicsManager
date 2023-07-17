@@ -13,6 +13,7 @@ namespace IngameScript
         public TextAlignment SpriteAlignment;
         public Action<SpriteData> Command;
         public UpdateFrequency CommandFrequency;
+        public long UniqueID; // this field is only set if sprite is using a command.
         public float
             SpriteSizeX,
             SpriteSizeY,
@@ -38,6 +39,7 @@ namespace IngameScript
             spriteType = SharedUtilities.defaultType;
             CommandFrequency = SharedUtilities.defaultUpdate;
             Command = null;
+            UniqueID = -1;
             UseStringBuilder = false;
             BuilderPrepend = BuilderAppend = "";
         }
