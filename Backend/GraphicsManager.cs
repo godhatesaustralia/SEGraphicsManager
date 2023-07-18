@@ -43,7 +43,9 @@ namespace IngameScript
         public Dictionary<long, MyItemType[]> ItemStorage;
         public HashSet<LinkedDisplay> Displays;
         public List<IMyTerminalBlock> AllBlocks, InventoryBlocks;
+            
         public DisplayIniKeys Keys;
+        public HydroloxUtilities TankUtils;
 
         internal const string
             myObjectBuilderString = "MyObjectBuilder";
@@ -52,13 +54,13 @@ namespace IngameScript
             space = ' ';
         internal string[] ammoNames = new string[]
         {
-            "ACN",
-            "GAT",
-            "RKT",
-            "ASL",
-            "ART",
-            "SRG",
-            "LRG"
+            "[ACN",
+            "[GAT",
+            "[RKT",
+            "[ASL",
+            "[ART",
+            "[SRG",
+            "[LRG"
         };
         internal StringBuilder Builder;
         
@@ -86,6 +88,7 @@ namespace IngameScript
             InventoryBlocks = new List<IMyTerminalBlock>();
             Keys = new DisplayIniKeys();
             Builder = new StringBuilder();
+            TankUtils = new HydroloxUtilities();
             Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
         }
 
@@ -106,18 +109,12 @@ namespace IngameScript
             
             Commands.Add("!h2%", (b) =>
             {
-                var last = b.Data;
-                List<IMyGasTank> tanks = new List<IMyGasTank>();
-                TerminalSystem.GetBlocksOfType(tanks);
-                var amt = 0d;
-                var total = amt;
-                foreach (var tank in tanks)
-                {
-                    amt += tank.FilledRatio * tank.Capacity;
-                    total += tank.Capacity;
-                }
-                var pct = amt / total;
-                b.Data = pct.ToString("#0.##%"); //keep this shrimple for now
+                b.Data = HydroloxUtilities.HydrogenStatus().ToString("#0.##%"); //keep this shrimple for now
+            });
+
+            Commands.Add("!h2t", (b) =>
+            {
+                b.Data = TankUtils.HydrogenTime(Program.Runtime.TimeSinceLastRun, Program);
             });
 
             Commands.Add("!ammo", (b) =>
@@ -185,16 +182,18 @@ namespace IngameScript
                     foreach (var block in InventoryBlocks)
                     {
                         SharedUtilities.TryGetItem(block, ItemStorage[b.UniqueID][i], ref amt);
+                        Me.CustomData += $"{block.CustomName} = {amt} // {i}\n";
                     }
                         
                     if (amt > 0)
                     {
                         var data = amt.ToString();
-                        Builder.AppendLine($"{ammoNames[i]} {data} {b.BuilderAppend}");
+                        Builder.AppendLine($"{ammoNames[i]} {data}{b.BuilderAppend}");
                     }
                 }
 
                 b.Data = Builder.ToString();
+                Builder.Clear();
             });
 
             Commands.Add("!item", (b) =>
@@ -217,6 +216,7 @@ namespace IngameScript
         public void Init()
         {
             Clear();
+            HydroloxUtilities.GetBlocks(TerminalSystem);
             Frame = 0;
             RuntimeMSRounded = 0;
             RuntimeMS = 0;
@@ -277,8 +277,9 @@ namespace IngameScript
                 
            if (Frame > 1000)
             {
-                Program.Echo($"<CYCLE: {Frame}>");
-                Program.Echo($"<SOURCE: {source}>");
+                Program.Echo($"cycle: {Frame}");
+                Program.Echo($"source: {source}");
+                Program.Echo($"runtime: {Program.Runtime.LastRunTimeMs}");
             }
                 
            

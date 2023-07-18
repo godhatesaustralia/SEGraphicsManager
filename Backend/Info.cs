@@ -13,6 +13,7 @@ using VRage.Collections;
 using VRage.Game;
 using VRage.Game.Components;
 using VRage.Game.GUI.TextPanel;
+using VRage.Game.ModAPI;
 using VRage.Game.ModAPI.Ingame;
 using VRage.Game.ModAPI.Ingame.Utilities;
 using VRage.Game.ObjectBuilders.Definitions;
@@ -22,95 +23,59 @@ using VRageRender;
 
 namespace IngameScript
 {
-    public class InventoryProvider
+   public class HydroloxUtilities
     {
-        #region ItemTypesList
+        public static List<IMyGasTank> 
+            HydrogenTanks = new List<IMyGasTank>(),
+            OxygenTanks = new List<IMyGasTank>();
+       public static List<IMyGasGenerator> Generators = new List<IMyGasGenerator>();
+        public static string invalid = "•••";
+       public double lastHydrogenValue;
+       public TimeSpan lastTime = TimeSpan.Zero;
 
-        // TypeIDs:
-        // MyObjectBuilder_Ingot
-        // MyObjectBuilder_AmmoMagazine
-        // MyObjectBuilder_Component
-        //
-        // SubtypeIDs:
-        // ------------AMMOMAGAZINES------------
-        // NATO_25x184mm [gat]
-        // Missile200mm
-        // AutocannonClip
-        // MediumCalibreAmmo [assault]
-        // LargeCalibreAmmo [shartillery]
-        // SmallRailgunAmmo
-        // LargeRailgunAmmo
+   
+        public static void GetBlocks(IMyGridTerminalSystem gts)
+        {
+            HydrogenTanks.Clear();
+            OxygenTanks.Clear();
+            Generators.Clear();
+            gts.GetBlocksOfType(HydrogenTanks, (b) => b.BlockDefinition.SubtypeId.Contains("Hydrogen"));
+            gts.GetBlocksOfType(OxygenTanks, (b) => b.BlockDefinition.SubtypeId.Contains("Oxygen"));
+            gts.GetBlocksOfType(Generators);
+        }
 
-        // NATO_5p56x45mm [depricated]
-        // SemiAutoPistolMagazine
-        // FullAutoPistolMagazine
-        // ElitePistolMagazine
-        // AutomaticRifleGun_Mag_20rd
-        // RapidFireAutomaticRifleGun_Mag_50rd <-THE INTERIOR TURRET ONE
-        // PreciseAutomaticRifleGun_Mag_5rd
-        // UltimateAutomaticRifleGun_Mag_30rd
+        public static double HydrogenStatus()
+        {
+            var amt = 0d;
+            var total = amt;
+            foreach (var tank in HydrogenTanks)
+            {
+                amt += tank.FilledRatio * tank.Capacity;
+                total += tank.Capacity;
+            }
+            return amt / total;
+        }
 
-        //------------COMPONENTS  ------------
-        // Construction
-        // MetalGrid
-        // InteriorPlate
-        // SteelPlate
-        // Girder
-        // SmallTube
-        // LargeTube
-        // Display
-        // BulletproofGlass
-        // Superconductor
-        // Computer
-        // Reactor
-        // Thrust
-        // GravityGenerator
-        // Medical
-        // RadioCommunication
-        // Detector
-        // Explosives
-        // SolarCell
-        // PowerCell
-        // Canvas
-        // Motor
-
-        // Northwind
-        // R75ammo          - Railgun 75mm)
-        // R150ammo         - Railgun 150mm)
-        // R250ammo         - Railgun 250mm)
-        // H203Ammo         - 203mm HE)
-        // H203AmmoAP       - 203mm AP)
-        // C30Ammo          - 30mm Standard)
-        // C30DUammo        - 30mm Dep. Uranium)
-        // CRAM30mmAmmo     - C-RAM (CIWS?))
-        // C100mmAmmo       - 100mm HE)
-        // C300AmmoAP       - 300mm AP)
-        // C300AmmoHE       - 300mm HE)
-        // C300AmmoG        - 300mm Guided)
-        // C400AmmoAP       - 400mm AP)
-        // C400AmmoHE       - 400mm HE)
-        // C400AmmoCluster  - 400mm Cluster)
-
-        // MWI Homing 
-        // TorpedoMk1           - M-1 Launcher
-        // DestroyerMissileX    - M-8 Launcher
-
-        // Kharak [OUTDATED]
-        //
-        // MyObjectBuilder_AmmoMagazine
-        //
-        // NATO_25x184mm
-        // NATO_5p56x45mm
-        // Ballistics_Flak
-        // Ballistics_Cannon
-        // Ballistics_Railgun
-        // Ballistics_MAC
-        // Missile200mm
-        // Missiles_Missile
-        // Missiles_Torpedo
-
-        #endregion
-
-
+        public string HydrogenTime(TimeSpan deltaT, MyGridProgram program)
+        {
+            if (lastTime == TimeSpan.Zero)
+            {
+                lastTime = deltaT;
+                return invalid;
+            }  
+            var current = lastTime + deltaT;
+           program.Me.CustomData += $"LAST {lastTime} CURRENT {current}\n";
+            var pct = HydrogenStatus();program.Me.CustomData += $"PCT {pct}\n";
+            var rate = MathHelperD.Clamp(lastHydrogenValue - pct, 1E-50, double.MaxValue) / (current - lastTime).TotalSeconds;
+            program.Me.CustomData += $"RATE {rate}\n";
+            var value = pct / rate;
+            lastTime = current;
+            lastHydrogenValue = HydrogenStatus();
+            if (rate < 1E-15 || double.IsNaN(value) || double.IsInfinity(value))
+                return invalid;
+            var time = TimeSpan.FromSeconds(value);
+            return string.Format("{0,2:D2}h {1,2:D2}m {2,2:D2}s", (long)time.TotalHours, (long)time.TotalMinutes, (long)time.Seconds);
+             
+        }
     }
 }

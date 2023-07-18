@@ -301,7 +301,7 @@ namespace IngameScript
             foreach (var display in DisplayOutputs)
                 if ((DisplayRefreshFreqencies[display.Key] & sourceFreqFlags) != 0) //is display frequency the same as frequency of update source?
                 {                                                                   // i.e. do we update display on this tick
-                    Program.Me.CustomData += $"UPDATED {display}, {Program.Runtime.TimeSinceLastRun}\n";
+                    //Program.Me.CustomData += $"UPDATED {display}, {Program.Runtime.TimeSinceLastRun}\n";
                     foreach (var name in display.Value.Keys)
                         if (CommandUsers[display.Key].Contains(name) && (display.Value[name].CommandFrequency & sourceFreqFlags) != 0) //is command frequency the same as frequency of update source?
                             display.Value[name].Command.Invoke(display.Value[name]);                                                   //i.e. do we run command on this tick
