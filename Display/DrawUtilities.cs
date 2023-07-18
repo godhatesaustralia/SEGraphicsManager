@@ -30,7 +30,6 @@ using VRageRender;
 
 namespace IngameScript
 {
-
     #region inventorystuff
     //--------------------------------------------------
     // [COMPONENTS]
@@ -201,21 +200,7 @@ namespace IngameScript
             if ((source & UpdateType.Update100) != 0) updateFrequency |= UpdateFrequency.Update100;//0100
             return updateFrequency;
         }
-        public static bool TryGetItem<T>(T block, MyItemType itemType, ref int total)
-            where T : IMyEntity
-        {
-            var initial = total;
-            if (block.HasInventory)
-            {
-                var inventory = block.GetInventory();
-                if (!inventory.ContainItems(1, itemType)) 
-                    return false;
-                total += inventory.GetItemAmount(itemType).ToIntSafe();
-            }
-            if (initial == total) 
-                return false;
-            return true;
-        }
+
         public static void SetupBarGraph(ref SpriteData sprite, float pctData)
         {
             if (sprite.SpriteSizeX > sprite.SpriteSizeY)

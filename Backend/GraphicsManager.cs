@@ -42,10 +42,11 @@ namespace IngameScript
         public Dictionary<string, Action<SpriteData>> Commands;
         public Dictionary<long, MyItemType[]> ItemStorage;
         public HashSet<LinkedDisplay> Displays;
-        public List<IMyTerminalBlock> AllBlocks, InventoryBlocks;
+        public List<IMyTerminalBlock> AllBlocks;
             
         public DisplayIniKeys Keys;
-        public HydroloxUtilities TankUtils;
+        public HydroloxUtilities GasUtils;
+        public InventoryUtilities InventoryUtils;
 
         internal const string
             myObjectBuilderString = "MyObjectBuilder";
@@ -63,10 +64,17 @@ namespace IngameScript
             "[LRG"
         };
         internal StringBuilder Builder;
+        internal TimeSpan DeltaT 
+        { get
+            { 
+                return Program.Runtime.TimeSinceLastRun; 
+            }
+        }
         
 
 
         bool justStarted = true; //shit ass bool for init
+        bool frozen = false;
         #endregion
 
         public GraphicsManager(MyGridProgram program)
@@ -85,10 +93,10 @@ namespace IngameScript
             ItemStorage = new Dictionary<long, MyItemType[]>();
             Displays = new HashSet<LinkedDisplay>();
             AllBlocks = new List<IMyTerminalBlock>();
-            InventoryBlocks = new List<IMyTerminalBlock>();
             Keys = new DisplayIniKeys();
             Builder = new StringBuilder();
-            TankUtils = new HydroloxUtilities();
+            GasUtils = new HydroloxUtilities();
+            InventoryUtils = new InventoryUtilities();
             Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
         }
 
@@ -98,7 +106,6 @@ namespace IngameScript
             ItemStorage.Clear();
             Displays.Clear();
             AllBlocks.Clear();
-            InventoryBlocks.Clear();
         }
 
         // SO...command formatting. Depends on the general command, but here's the idea
@@ -107,15 +114,17 @@ namespace IngameScript
         public void RegisterCommands()
         {
             
-            Commands.Add("!h2%", (b) =>
-            {
-                b.Data = HydroloxUtilities.HydrogenStatus().ToString("#0.##%"); //keep this shrimple for now
-            });
+            Commands.Add("!h2%", (b) => 
+                b.Data = GasUtils.HydrogenStatus().ToString("#0.##%"));
 
-            Commands.Add("!h2t", (b) =>
-            {
-                b.Data = TankUtils.HydrogenTime(Program.Runtime.TimeSinceLastRun, Program);
-            });
+            Commands.Add("!o2%", (b) =>
+                b.Data = GasUtils.OxygenStatus().ToString("#0.##%"));
+
+            Commands.Add("!h2t", (b) => 
+                b.Data = GasUtils.HydrogenTime(DeltaT, Program));
+
+            Commands.Add("!ice", (b) =>
+                b.Data = GasUtils.IceRate(InventoryUtilities.InventoryBlocks, DeltaT));
 
             Commands.Add("!ammo", (b) =>
             {
@@ -136,13 +145,13 @@ namespace IngameScript
                     };
                     foreach (var ammo in ammos)
                         if (b.Data == ammo)
-                            ItemStorage.Add(b.UniqueID, new MyItemType[] { new MyItemType($"{myObjectBuilderString}_AmmoMagazine", ammo) });
+                            InventoryUtils.ItemStorage.Add(b.UniqueID, new MyItemType[] { new MyItemType($"{InventoryUtilities.myObjectBuilderString}_AmmoMagazine", ammo) });
                     //throw new Exception(" DIE");
                     //if (ammoType == null) ammoType = MyItemType.MakeAmmo(ammos[1]); this seem return null....
                     
                 }  
-                foreach (var block in InventoryBlocks)
-                    SharedUtilities.TryGetItem(block, ItemStorage[b.UniqueID][0], ref amt);
+                foreach (var block in InventoryUtilities.InventoryBlocks)
+                    InventoryUtilities.TryGetItem(block, ref ItemStorage[b.UniqueID][0], ref amt);
                 b.Data = amt.ToString();
 
                 if (!b.UseStringBuilder)      
@@ -172,16 +181,16 @@ namespace IngameScript
                     "SmallRailgunAmmo",
                     "LargeRailgunAmmo"
                     };
-                    ItemStorage.Add(b.UniqueID, new MyItemType[7]);
+                    InventoryUtils.ItemStorage.Add(b.UniqueID, new MyItemType[7]);
                     for (int i = 0; i < 6; ++i) //it's okay!! becausawe im drunk
-                            ItemStorage[b.UniqueID][i] = new MyItemType($"{myObjectBuilderString}_AmmoMagazine", ammos[i]);
+                            InventoryUtils.ItemStorage[b.UniqueID][i] = new MyItemType($"{InventoryUtilities.myObjectBuilderString}_AmmoMagazine", ammos[i]);
                 }
                 for (int i = 0; i < 6; ++i)
                 {
                     var amt = 0;
-                    foreach (var block in InventoryBlocks)
+                    foreach (var block in InventoryUtilities.InventoryBlocks)
                     {
-                        SharedUtilities.TryGetItem(block, ItemStorage[b.UniqueID][i], ref amt);
+                        InventoryUtilities.TryGetItem(block, ref ItemStorage[b.UniqueID][i], ref amt);
                         Me.CustomData += $"{block.CustomName} = {amt} // {i}\n";
                     }
                         
@@ -205,10 +214,10 @@ namespace IngameScript
                     {
                        b.Data = b.Data.Trim();
                        var stringParts = b.Data.Split(commandSplit);
-                       itemType = new MyItemType($"{myObjectBuilderString}_{stringParts[0]}", stringParts[1]);
+                       itemType = new MyItemType($"{InventoryUtilities.myObjectBuilderString}_{stringParts[0]}", stringParts[1]);
                     }
-                foreach (var block in InventoryBlocks)
-                    SharedUtilities.TryGetItem(block, itemType, ref amt);
+                foreach (var block in InventoryUtilities.InventoryBlocks)
+                    InventoryUtilities.TryGetItem(block, ref itemType, ref amt);
                 b.Data = amt.ToString();
             });
         }
@@ -216,13 +225,12 @@ namespace IngameScript
         public void Init()
         {
             Clear();
-            HydroloxUtilities.GetBlocks(TerminalSystem);
+            GasUtils.GetBlocks(TerminalSystem);
             Frame = 0;
             RuntimeMSRounded = 0;
             RuntimeMS = 0;
             Keys.ResetKeys(); // lol. lmao
             TerminalSystem.GetBlocksOfType(AllBlocks);
-            TerminalSystem.GetBlocksOfType(InventoryBlocks, (b) => b.HasInventory);//WHY ISN'T IT POSSIBLE
             RegisterCommands();
             
             List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
@@ -243,7 +251,7 @@ namespace IngameScript
 
         void UpdateTimes()
         {
-            RuntimeMS += Program.Runtime.TimeSinceLastRun.TotalMilliseconds;
+            RuntimeMS += DeltaT.TotalMilliseconds;
             RuntimeMSRounded = (long)RuntimeMS;
             Frame++;
         }
@@ -260,6 +268,21 @@ namespace IngameScript
                             Init();
                             break;
                         }
+                    case "freeze":
+                        {
+                            if (frozen)
+                            {
+                                Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
+                                frozen = false;
+                                break;
+                            }
+                            else
+                            {
+                                Program.Runtime.UpdateFrequency = SharedUtilities.defaultUpdate;
+                                frozen = true;
+                                break;
+                            }
+                        }
                     default: { break; }
                 }
             }
@@ -272,14 +295,14 @@ namespace IngameScript
                     display.Update(ref source);
                 targetflags |= display.UpdateFrequency;
             }
-
             Program.Runtime.UpdateFrequency = targetflags;
+            GasUtils.LastTimeUpdate(DeltaT);
                 
            if (Frame > 1000)
             {
                 Program.Echo($"cycle: {Frame}");
                 Program.Echo($"source: {source}");
-                Program.Echo($"runtime: {Program.Runtime.LastRunTimeMs}");
+                Program.Echo($"runtime: {Program.Runtime.LastRunTimeMs} ms");
             }
                 
            
