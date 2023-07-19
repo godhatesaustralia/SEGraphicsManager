@@ -31,8 +31,6 @@ namespace IngameScript
         public MyGridProgram Program;
         public IMyGridTerminalSystem TerminalSystem;
         public IMyProgrammableBlock Me;
-        public IMyCubeGrid HostShip;
-        public IMyShipController Controller;
 
         public long
         Frame,
@@ -45,7 +43,7 @@ namespace IngameScript
         public List<IMyTerminalBlock> AllBlocks;
             
         public DisplayIniKeys Keys;
-        public HydroloxUtilities GasUtils;
+        public GasUtilities GasUtils;
         public InventoryUtilities InventoryUtils;
 
         internal const string
@@ -82,20 +80,13 @@ namespace IngameScript
             Program = program;
             TerminalSystem = program.GridTerminalSystem;
             Me = program.Me;
-            HostShip = Me.CubeGrid;
-            TerminalSystem.GetBlocksOfType<IMyShipController>(null, (b) =>
-            {
-                if (b.CustomName.Contains("[I]"))
-                    Controller = b;
-                return true;
-            });
             Commands = new Dictionary<string, Action<SpriteData>>();
             ItemStorage = new Dictionary<long, MyItemType[]>();
             Displays = new HashSet<LinkedDisplay>();
             AllBlocks = new List<IMyTerminalBlock>();
             Keys = new DisplayIniKeys();
             Builder = new StringBuilder();
-            GasUtils = new HydroloxUtilities();
+            GasUtils = new GasUtilities();
             InventoryUtils = new InventoryUtilities();
             Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
         }
@@ -225,7 +216,7 @@ namespace IngameScript
         public void Init()
         {
             Clear();
-            GasUtils.GetBlocks(TerminalSystem);
+
             Frame = 0;
             RuntimeMSRounded = 0;
             RuntimeMS = 0;
@@ -296,7 +287,6 @@ namespace IngameScript
                 targetflags |= display.UpdateFrequency;
             }
             Program.Runtime.UpdateFrequency = targetflags;
-            GasUtils.LastTimeUpdate(DeltaT);
                 
            if (Frame > 1000)
             {
