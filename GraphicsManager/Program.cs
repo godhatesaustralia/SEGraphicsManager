@@ -28,6 +28,9 @@ namespace IngameScript
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
             Manager = new GraphicsManager(this);
+            Manager.Utilities.Add(new GasUtilities());
+            Manager.Utilities.Add(new InventoryUtilities());
+            Manager.Utilities.Add(new FlightUtilities());
             Manager.Init();
         }
 
