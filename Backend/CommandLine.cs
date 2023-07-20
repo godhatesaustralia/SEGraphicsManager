@@ -74,7 +74,7 @@ namespace IngameScript
         public bool CommandDataOutput(string input, out double data)
         {
             long dataLong = Convert.ToInt64(input, 16);
-            bool success = $"{dataLong:x}" == input ? true : false;
+            bool success = $"{dataLong:x}" == input;
             data = BitConverter.Int64BitsToDouble(dataLong);
             return success;
         }

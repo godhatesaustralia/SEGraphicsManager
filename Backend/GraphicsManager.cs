@@ -43,7 +43,6 @@ namespace IngameScript
         public List<IMyTerminalBlock> AllBlocks;
             
         public DisplayIniKeys Keys;
-
         internal StringBuilder Builder;
 
         bool frozen = false;

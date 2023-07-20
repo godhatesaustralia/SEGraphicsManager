@@ -73,7 +73,11 @@ namespace IngameScript
             HydrogenTanks = new List<IMyGasTank>(),
             OxygenTanks = new List<IMyGasTank>();
         public static MyItemType Ice = new MyItemType("MyObjectBuilder_Ore", "Ice");
-        public double lastHydrogen = 0, lastIce = 0;
+        double lastHydrogen = 0;
+        int lastIce = 0;
+        int[] savedIce = new int[10];
+
+
         public TimeSpan lastTime = TimeSpan.Zero;
 
         #region InfoUtility
@@ -499,7 +503,7 @@ namespace IngameScript
 
         public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands)
         {
-            commands.Add("!aoa", (b) => b.Data = GetAoA());
+            commands.Add("!horiz", (b) => b.Data = GetHorizonAngle());
         }
         #endregion
 
@@ -515,19 +519,14 @@ namespace IngameScript
             return true;
         }
 
-        public string GetAoA()
+        public string GetHorizonAngle()
         {
-            var grav = VZed;
+            var grav = VZed; // Vector3D.Zero         
             if (!GravCheck(out grav))
                 return invalid;
-            var gridMatrix = Controller.WorldMatrix;
-            var fwd = Controller.WorldMatrix.Forward;
-            fwd.Normalize();
             grav.Normalize();
-            var aoa = Math.Acos(MathHelper.Clamp(fwd.Dot(fwd.Dot(grav) * grav), -1, 1)); //i did it on paper. dont ask = )
-            MathHelper.ToDegrees(aoa);
-            return aoa.ToString("{0,4}:F2") + "°";
-
+            var aoa = Math.Asin(MathHelper.Clamp(grav.Dot(Controller.WorldMatrix.Forward), -1, 1));
+            return MathHelper.ToDegrees(aoa).ToString("#0.##°");
         }
     }
 }
