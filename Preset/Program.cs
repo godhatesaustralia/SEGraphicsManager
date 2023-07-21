@@ -29,7 +29,7 @@ namespace IngameScript
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
             Manager = new GraphicsManager(this);
 
-            Manager.useCustomDisplays = true;
+            Manager.useCustomDisplays = false;
             Manager.Keys = new DisplayIniKeys();
 
             Manager.Utilities.Add(new GasUtilities());
@@ -37,7 +37,6 @@ namespace IngameScript
             Manager.Utilities.Add(new FlightUtilities());
             Manager.Init();
         }
-
         public void Main(string argument, UpdateType updateSource)
         {
             Manager.Update(argument, updateSource);

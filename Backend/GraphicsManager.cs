@@ -28,6 +28,8 @@ namespace IngameScript
     {
         #region fields
 
+        public bool useCustomDisplays;
+
         public MyGridProgram Program;
         public IMyGridTerminalSystem TerminalSystem;
         public IMyProgrammableBlock Me;
@@ -38,7 +40,7 @@ namespace IngameScript
         public double RuntimeMS;
 
         public Dictionary<string, Action<SpriteData>> Commands;
-        public HashSet<LinkedDisplay> Displays;
+        public HashSet<DisplayBase> Displays;
         public HashSet<InfoUtility> Utilities; //hash set for now
         public List<IMyTerminalBlock> AllBlocks;
             
@@ -54,10 +56,9 @@ namespace IngameScript
             TerminalSystem = program.GridTerminalSystem;
             Me = program.Me;
             Commands = new Dictionary<string, Action<SpriteData>>();
-            Displays = new HashSet<LinkedDisplay>();
+            Displays = new HashSet<DisplayBase>();
             Utilities = new HashSet<InfoUtility>();
             AllBlocks = new List<IMyTerminalBlock>();
-            Keys = new DisplayIniKeys();
             Builder = new StringBuilder();
             Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
         }
@@ -76,7 +77,6 @@ namespace IngameScript
             Frame = 0;
             RuntimeMSRounded = 0;
             RuntimeMS = 0;
-            Keys.ResetKeys(); // lol. lmao
             TerminalSystem.GetBlocksOfType(AllBlocks);
 
             foreach (InfoUtility utility in Utilities)
@@ -84,19 +84,24 @@ namespace IngameScript
             foreach (InfoUtility utility in Utilities)
                 utility.RegisterCommands(ref Commands);
 
-            List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
-            TerminalSystem.GetBlockGroupWithName("LCT Screen Control").GetBlocks(blocks);
-            foreach (var block in blocks)
+           if (useCustomDisplays)
             {
-                var display = new LinkedDisplay(block, ref Commands, ref Program, ref Keys);
-                Displays.Add(display);
-                display.Setup(block);
-                foreach (var surface in display.DisplayOutputs)
+                Keys.ResetKeys(); // lol. lmao
+                List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
+                TerminalSystem.GetBlockGroupWithName("LCT Screen Control").GetBlocks(blocks);
+                foreach (var block in blocks)
                 {
-                    Program.Echo($"SURFACE {surface.Key.DisplayName} LOADED\n");
-                    Program.Echo($"SURFACE UPDATE {display.DisplayRefreshFreqencies[surface.Key]}");
-                }      
+                    var display = new LinkedDisplay(block, ref Commands, ref Program, ref Keys);
+                    Displays.Add(display);
+                    display.Setup(block);
+                    foreach (var surface in display.DisplayOutputs)
+                    {
+                        Program.Echo($"SURFACE {surface.Key.DisplayName} LOADED\n");
+                        Program.Echo($"SURFACE UPDATE {display.DisplayRefreshFreqencies[surface.Key]}");
+                    }
+                }
             }
+
             InfoUtility.justStarted = false;
         }
 

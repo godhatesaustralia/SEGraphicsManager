@@ -75,7 +75,7 @@ namespace IngameScript
         public static MyItemType Ice = new MyItemType("MyObjectBuilder_Ore", "Ice");
         double lastHydrogen = 0;
         int lastIce = 0;
-        int[] savedIce = new int[10];
+        Queue<double> savedIce = new Queue<double>(10);
 
 
         public TimeSpan lastTime = TimeSpan.Zero;
@@ -101,7 +101,7 @@ namespace IngameScript
             commands.Add("!h2t", (b) =>
                 b.Data = HydrogenTime());
 
-            commands.Add("!ice", (b) =>
+            commands.Add("!ice", (b) => // ONLY USE WITH UPDATE100
                 b.Data = IceRate(InventoryUtilities.InventoryBlocks));
         }
 
@@ -137,11 +137,10 @@ namespace IngameScript
                 lastTime = DeltaT;
                 return invalid;
             }  
-            var current = lastTime + DeltaT;
             //program.Me.CustomData += $"LAST {lastTime} CURRENT {current}\n";
             var pct = HydrogenStatus();
             //program.Me.CustomData += $"PCT {pct}\n";
-            var rate = MathHelperD.Clamp(lastHydrogen - pct, 1E-50, double.MaxValue) / (current - lastTime).TotalSeconds;
+            var rate = MathHelperD.Clamp(lastHydrogen - pct, 1E-50, double.MaxValue) / DeltaT.TotalSeconds;
             //program.Me.CustomData += $"RATE {rate}\n";
             var value = pct / rate;
             lastHydrogen = HydrogenStatus();
@@ -156,14 +155,17 @@ namespace IngameScript
         }
         public string IceRate(List<IMyTerminalBlock> blocks)
         {
-            var current = lastTime + DeltaT;
+            if (savedIce.Count == 10)
+                savedIce.Dequeue();
             var amt = 0;
             foreach (var block in blocks)
                 InventoryUtilities.TryGetItem(block, ref Ice, ref amt);
-            var rate = Math.Abs((lastIce - amt) / (current - lastTime).TotalSeconds);
-            lastIce = amt;
+            savedIce.Enqueue(amt);
+            if (savedIce.Count < 10)
+                return invalid;
+            var rate = (savedIce.First() - savedIce.Last()) / 2;
             if (rate < 0) return invalid;
-            return rate.ToString("0,4") + " kg/s";
+            return $"{rate:000.0} kg/s";
         }
     }
 
@@ -525,8 +527,8 @@ namespace IngameScript
             if (!GravCheck(out grav))
                 return invalid;
             grav.Normalize();
-            var aoa = Math.Asin(MathHelper.Clamp(grav.Dot(Controller.WorldMatrix.Forward), -1, 1));
-            return MathHelper.ToDegrees(aoa).ToString("#0.##°");
+            var aoa = Math.Asin(MathHelper.Clamp(Controller.WorldMatrix.Forward.Dot(grav), -1, 1));
+            return MathHelper.ToDegrees(aoa).ToString("-#0.##; +#0.##") + "°";
         }
     }
 }

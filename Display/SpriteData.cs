@@ -30,7 +30,8 @@ namespace IngameScript
         public Color SpriteColor;
         public bool
             UseStringBuilder, //for commands, whether to apply stringbuilder (and to attempt parse of stringbuilder param)
-            newData = false;
+            Update60,
+            Update1000;
 
         #endregion
 

@@ -25,22 +25,59 @@ using VRageRender;
 
 namespace IngameScript
 {
-    public class LinkedDisplay
+    public abstract class DisplayBase
     {
         #region fields
 
+        protected MyGridProgram Program;
+        protected Dictionary<IMyTextSurface, HashSet<string>> CommandUsers;
+
         public UpdateFrequency UpdateFrequency;
-        public MyGridProgram Program;
-        public Dictionary<IMyTextSurface, Dictionary<string, SpriteData>> DisplayOutputs;
         public Dictionary<string, Action<SpriteData>> Commands;
-        public Dictionary<IMyTextSurface, HashSet<string>> CommandUsers;
+        public Dictionary<IMyTextSurface, Dictionary<string, SpriteData>> DisplayOutputs;
         public Dictionary<IMyTextSurface, UpdateFrequency> DisplayRefreshFreqencies;
-        internal DisplayIniKeys Keys;
         public string DisplayName;
         public long DisplayID;
-        bool isSingleScreen;
 
         #endregion
+
+        public abstract void Setup(IMyTerminalBlock block);
+
+        public abstract void Update(ref UpdateType sourceFlags);
+
+        protected virtual void DrawNewSprite(ref MySpriteDrawFrame frame, ref Vector2 center, SpriteData data)
+        {
+            var sprite = data.spriteType == SharedUtilities.defaultType ? new MySprite(
+                data.spriteType,
+                data.Data,
+                new Vector2(data.SpritePosX, data.SpritePosY), // + center,
+                null,
+                data.SpriteColor,
+                data.FontID,
+                data.SpriteAlignment,
+                data.SpriteRorS
+                )
+                : new MySprite(
+                data.spriteType,
+                data.Data,
+                new Vector2(data.SpritePosX, data.SpritePosY), // + center,
+                new Vector2(data.SpriteSizeX, data.SpriteSizeY),
+                data.SpriteColor,
+                null,
+                data.SpriteAlignment,
+                MathHelper.ToRadians(data.SpriteRorS)
+                    );
+            //Program.Me.CustomData += $"\n{sprite.Type}, \n{sprite.Data}, \n{sprite.Size}, \n{sprite.Position}, \n{sprite.Color}, \n{sprite.Alignment}\n";
+            frame.Add(sprite);
+        }
+
+    }
+
+
+    public class LinkedDisplay : DisplayBase
+    {
+        DisplayIniKeys Keys;
+        bool isSingleScreen;
 
         public LinkedDisplay(IMyTerminalBlock block, ref Dictionary<string, Action<SpriteData>> commandsDict, ref MyGridProgram program, ref DisplayIniKeys keys)
         {
@@ -84,7 +121,7 @@ namespace IngameScript
         // and so on
 
         #endregion
-        internal virtual bool TryAddSprites(ref IMyTextSurface thisSurface, ref Parser myParser, ref byte index, out UpdateFrequency screenFrequency)
+        bool TryAddSprites(ref IMyTextSurface thisSurface, ref Parser myParser, ref byte index, out UpdateFrequency screenFrequency)
         {
             string ScreenSection;
             screenFrequency = SharedUtilities.defaultUpdate;
@@ -144,8 +181,15 @@ namespace IngameScript
                             // >UPDATE
                             if (myParser.ContainsKey(nametag, Keys.UpdateKey))
                             {
-                                sprite.CommandFrequency = (UpdateFrequency)myParser.ParseByte(nametag, Keys.UpdateKey, 0);
-                                screenFrequency |= sprite.CommandFrequency;
+                                var update = myParser.ParseByte(nametag, Keys.UpdateKey, 0);
+                                sprite.Update60 = update == 60;
+                                sprite.Update1000 = update == 100;
+                                if (!sprite.Update60 && !sprite.Update1000)
+                                {
+                                    sprite.CommandFrequency = (UpdateFrequency)update;
+                                    screenFrequency |= sprite.CommandFrequency;
+                                }
+                       
                             }
                             else
                                 sprite.CommandFrequency = SharedUtilities.defaultUpdate;
@@ -186,7 +230,7 @@ namespace IngameScript
             return didNotFail;
         }
 
-        internal void CartesianReader(ref SpriteData sprite, ref Parser myParser, string key, string nametag)
+        void CartesianReader(ref SpriteData sprite, ref Parser myParser, string key, string nametag)
         {
             var coords = myParser.ParseString(nametag, key).Split(',');
 
@@ -203,8 +247,7 @@ namespace IngameScript
             }
         }
 
-        public virtual void Setup<T>(T block)
-            where T : IMyTerminalBlock
+        public override void Setup(IMyTerminalBlock block)
         {
             Parser MyParser = new Parser();
             byte index = 0;          
@@ -264,38 +307,10 @@ namespace IngameScript
                 UpdateFrequency |= updateFrequency;
                 Program.Echo($"{UpdateFrequency}");
             }
-                
-                
+                          
         }
 
-        public void DrawNewSprite(ref MySpriteDrawFrame frame, ref Vector2 center, SpriteData data)
-        {
-            var sprite = data.spriteType == SharedUtilities.defaultType ? new MySprite(
-                data.spriteType,
-                data.Data,
-                new Vector2(data.SpritePosX, data.SpritePosY), // + center,
-                null,
-                data.SpriteColor,
-                data.FontID,
-                data.SpriteAlignment,
-                data.SpriteRorS
-                )
-                : new MySprite(
-                data.spriteType,
-                data.Data,
-                new Vector2(data.SpritePosX, data.SpritePosY), // + center,
-                new Vector2(data.SpriteSizeX, data.SpriteSizeY),
-                data.SpriteColor,
-                null,
-                data.SpriteAlignment,
-                MathHelper.ToRadians(data.SpriteRorS)
-                    );
-            //Program.Me.CustomData += $"\n{sprite.Type}, \n{sprite.Data}, \n{sprite.Size}, \n{sprite.Position}, \n{sprite.Color}, \n{sprite.Alignment}\n";
-            frame.Add(sprite);
-
-        }
-
-        public virtual void Update(ref UpdateType sourceFlags)
+        public override void Update(ref UpdateType sourceFlags)
         {
             var sourceFreqFlags = SharedUtilities.UpdateConverter(sourceFlags);
             foreach (var display in DisplayOutputs)
