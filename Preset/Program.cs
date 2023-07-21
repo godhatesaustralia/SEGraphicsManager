@@ -28,7 +28,7 @@ namespace IngameScript
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
             Manager = new GraphicsManager(this);
-
+            // NO TOUCH DISPLAY ;)
             Manager.useCustomDisplays = false;
             Manager.Keys = new DisplayIniKeys();
 
