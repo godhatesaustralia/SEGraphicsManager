@@ -74,11 +74,7 @@ namespace IngameScript
             OxygenTanks = new List<IMyGasTank>();
         public static MyItemType Ice = new MyItemType("MyObjectBuilder_Ore", "Ice");
         double lastHydrogen = 0;
-        int lastIce = 0;
         Queue<double> savedIce = new Queue<double>(10);
-
-
-        public TimeSpan lastTime = TimeSpan.Zero;
 
         #region InfoUtility
         public override void Reset(MyGridProgram program)
@@ -101,8 +97,12 @@ namespace IngameScript
             commands.Add("!h2t", (b) =>
                 b.Data = HydrogenTime());
 
-            commands.Add("!ice", (b) => // ONLY USE WITH UPDATE100
-                b.Data = IceRate(InventoryUtilities.InventoryBlocks));
+            commands.Add("!ice", (b) =>
+            {// ONLY USE WITH UPDATE100
+                var rate = 0d;
+                b.Data = InventoryUtilities.TryGetUseRate(ref Ice, ref savedIce, ref InventoryUtilities.InventoryBlocks, out rate) ? $"{rate:000.0} kg/s" : "0 kg/s";
+            });
+             
         }
 
         #endregion
@@ -132,12 +132,6 @@ namespace IngameScript
 
         public string HydrogenTime()
         {
-            if (lastTime == TimeSpan.Zero)
-            {
-                lastTime = DeltaT;
-                return invalid;
-            }  
-            //program.Me.CustomData += $"LAST {lastTime} CURRENT {current}\n";
             var pct = HydrogenStatus();
             //program.Me.CustomData += $"PCT {pct}\n";
             var rate = MathHelperD.Clamp(lastHydrogen - pct, 1E-50, double.MaxValue) / DeltaT.TotalSeconds;
@@ -148,24 +142,6 @@ namespace IngameScript
                 return invalid;
             var time = TimeSpan.FromSeconds(value);
             return string.Format("{0,2:D2}h {1,2:D2}m {2,2:D2}s", (long)time.TotalHours, (long)time.TotalMinutes, (long)time.Seconds); 
-        }
-        public void LastTimeUpdate()
-        {
-        lastTime += DeltaT;
-        }
-        public string IceRate(List<IMyTerminalBlock> blocks)
-        {
-            if (savedIce.Count == 10)
-                savedIce.Dequeue();
-            var amt = 0;
-            foreach (var block in blocks)
-                InventoryUtilities.TryGetItem(block, ref Ice, ref amt);
-            savedIce.Enqueue(amt);
-            if (savedIce.Count < 10)
-                return invalid;
-            var rate = (savedIce.First() - savedIce.Last()) / 2;
-            if (rate < 0) return invalid;
-            return $"{rate:000.0} kg/s";
         }
     }
 
@@ -376,6 +352,24 @@ namespace IngameScript
                 return false;
             return true;
         }
+
+        public static bool TryGetUseRate<T>(ref MyItemType item, ref Queue<double> storage, ref List<T> blocks, out double rate)
+            where T : IMyEntity
+        {       
+            if (storage.Count == 10) // whatever
+                storage.Dequeue();
+            var amt = 0;
+            rate = 0d;
+            foreach (var block in blocks)
+               TryGetItem(block, ref item, ref amt);
+            storage.Enqueue(amt);
+            if (storage.Count < 10)
+                return false;
+            rate = (storage.First() - storage.Last()) / 2;
+            if (rate < 0) return false;
+            return true;
+        }
+
         #region InfoUtility
         public override void Reset(MyGridProgram program)
         {
@@ -424,7 +418,6 @@ namespace IngameScript
                 if (b.BuilderAppend.Length > 0)
                     b.Data = $"{b.Data} {b.BuilderAppend}";
             });
-
             commands.Add("!ammos", (b) =>
             {
                 if (!b.UseStringBuilder)
@@ -481,6 +474,7 @@ namespace IngameScript
                 b.Data = amt.ToString();
             });
         }
+
         #endregion
     }
     public class FlightUtilities : InfoUtility
@@ -506,6 +500,8 @@ namespace IngameScript
         public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands)
         {
             commands.Add("!horiz", (b) => b.Data = GetHorizonAngle());
+            commands.Add("!seaalt", (b) => b.Data = GetAlt(MyPlanetElevation.Sealevel));
+            commands.Add("!suralt", (b) => b.Data = GetAlt(MyPlanetElevation.Surface));
         }
         #endregion
 
@@ -529,6 +525,59 @@ namespace IngameScript
             grav.Normalize();
             var aoa = Math.Asin(MathHelper.Clamp(Controller.WorldMatrix.Forward.Dot(grav), -1, 1));
             return MathHelper.ToDegrees(aoa).ToString("-#0.##; +#0.##") + "°";
+        }
+
+        public string GetAlt(MyPlanetElevation elevation)
+        {
+            var grav = VZed; // Vector3D.Zero         
+            if (!GravCheck(out grav))
+                return invalid;
+            var alt = 0d;
+            if (Controller.TryGetPlanetElevation(elevation, out alt))
+                return $"{alt:0000} m";
+            return invalid;
+        }
+    }
+
+    public class PowerUtilities : InfoUtility
+    {
+        List<IMyBatteryBlock> Batteries = new List<IMyBatteryBlock>();
+        List<IMyReactor> Reactors = new List<IMyReactor>();
+        MyItemType uraniumIngot = new MyItemType($"{InventoryUtilities.myObjectBuilderString}_Ingot", "Uranium");
+        Queue<double> savedUranium = new Queue<double>(10);
+
+        #region InfoUtility
+        public override void Reset(MyGridProgram program)
+        {
+            base.Reset(program);
+            Batteries.Clear();
+            Reactors.Clear();
+            TerminalSystem.GetBlocksOfType(Batteries, (battery) => battery.IsSameConstructAs(program.Me));
+            TerminalSystem.GetBlocksOfType(Reactors, (reactor) => reactor.IsSameConstructAs(program.Me));
+        }
+
+        public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands)
+        {
+            commands.Add("!battcharge", (b) => b.Data = BatteryCharge());
+            commands.Add("!fissionrate", (b) =>
+            {
+                var rate = 0d;
+                b.Data = InventoryUtilities.TryGetUseRate(ref uraniumIngot, ref savedUranium, ref Reactors, out rate) ? $"{rate:000.0} kg/s" : "0 kg/s";
+            });
+        }
+        #endregion
+        public string BatteryCharge()
+        {
+            if (Batteries.Count == 0) 
+                return invalid;
+            var charge = 0d;
+            var total = charge;
+            foreach ( var battery in Batteries)
+            {
+                charge += battery.CurrentStoredPower;
+                total += battery.MaxStoredPower;
+            }
+            return (charge / total).ToString("#0.##%");
         }
     }
 }
