@@ -182,13 +182,8 @@ namespace IngameScript
                             if (myParser.ContainsKey(nametag, Keys.UpdateKey))
                             {
                                 var update = myParser.ParseByte(nametag, Keys.UpdateKey, 0);
-                                sprite.Update60 = update == 60;
-                                sprite.Update1000 = update == 100;
-                                if (!sprite.Update60 && !sprite.Update1000)
-                                {
-                                    sprite.CommandFrequency = (UpdateFrequency)update;
-                                    screenFrequency |= sprite.CommandFrequency;
-                                }
+                                sprite.CommandFrequency = (UpdateFrequency)update;
+                                screenFrequency |= sprite.CommandFrequency;
                        
                             }
                             else

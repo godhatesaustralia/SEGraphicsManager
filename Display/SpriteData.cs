@@ -28,10 +28,12 @@ namespace IngameScript
             BuilderPrepend,
             BuilderAppend;
         public Color SpriteColor;
+
+        public SpriteData[] Children;
+
         public bool
-            UseStringBuilder, //for commands, whether to apply stringbuilder (and to attempt parse of stringbuilder param)
-            Update60,
-            Update1000;
+            UseStringBuilder; //for commands, whether to apply stringbuilder (and to attempt parse of stringbuilder param)
+
 
         #endregion
 
@@ -58,7 +60,7 @@ namespace IngameScript
             SpriteRorS = ros;
             SpriteColor = color;
             FontID = fontid;
-            CommandFrequency = updateType; //NONE = 0, 1 = 1, 10 = 2, 100 = 3, ONCE = 8
+            CommandFrequency = updateType; //NONE = 0, 1 = 1, 10 = 2, 100 = 4, ONCE = 8
             CommandString = command;
             UseStringBuilder = builder;
             BuilderPrepend = prepend;
