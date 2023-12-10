@@ -33,10 +33,19 @@ namespace IngameScript
         internal MyGridProgram Program;
         internal IMyGridTerminalSystem TerminalSystem;
         internal const char
-            commandSplit = '$',
+            commandSplit = '!',
             space = ' ';
-        internal string invalid = "[NULL]";
+        internal string invalid = "••";
         internal StringBuilder Builder;
+        public static void ApplyBuilder(SpriteData d)
+        {
+            StringBuilder builder = new StringBuilder(d.Data);
+            if (d.BuilderPrepend != null)
+                builder.Insert(0, d.BuilderPrepend);
+            if (d.BuilderAppend != null)
+                builder.Append(d.BuilderAppend);
+            d.Data = builder.ToString();
+        }
         internal TimeSpan DeltaT
         {
             get
@@ -69,12 +78,18 @@ namespace IngameScript
 
     public class GasUtilities : InfoUtility
     {
+        InventoryUtilities Inventory;
         public static List<IMyGasTank> 
             HydrogenTanks = new List<IMyGasTank>(),
             OxygenTanks = new List<IMyGasTank>();
-        public static MyItemType Ice = new MyItemType("MyObjectBuilder_Ore", "Ice");
+        public static InventoryItem Ice = new InventoryItem(new MyItemType("MyObjectBuilder_Ore", "Ice"));
         double lastHydrogen = 0;
         Queue<double> savedIce = new Queue<double>(10);
+
+        public GasUtilities(InventoryUtilities inventory)
+        {
+            Inventory = inventory;
+        }
 
         #region InfoUtility
         public override void Reset(MyGridProgram program)
@@ -96,11 +111,12 @@ namespace IngameScript
 
             commands.Add("!h2t", (b) =>
                 b.Data = HydrogenTime());
+                
 
             commands.Add("!ice", (b) =>
             {// ONLY USE WITH UPDATE100
                 var rate = 0d;
-                b.Data = InventoryUtilities.TryGetUseRate(ref Ice, ref savedIce, ref InventoryUtilities.InventoryBlocks, out rate) ? $"{rate:000.0} kg/s" : "0 kg/s";
+                b.Data = Inventory.TryGetUseRate(ref Ice, ref savedIce, ref InventoryUtilities.InventoryBlocks, out rate) ? $"{rate:000.0} kg/s" : "0 kg/s";
             });
              
         }
@@ -141,26 +157,45 @@ namespace IngameScript
             if (rate < 1E-15 || double.IsNaN(value) || double.IsInfinity(value))
                 return invalid;
             var time = TimeSpan.FromSeconds(value);
+        
             return string.Format("{0,2:D2}h {1,2:D2}m {2,2:D2}s", (long)time.TotalHours, (long)time.TotalMinutes, (long)time.Seconds); 
+        }
+    }
+    public class InventoryItem
+    {
+        public string Tag = "";
+        public MyItemType Type;
+        public int Quantity = 0;
+        public InventoryItem(string[] line)
+        {
+            if (line.Length != 3) return;
+            Tag = line[0];
+            Type = new MyItemType(InventoryUtilities.myObjectBuilderString + '_' + line[1], line[2]);
+        }
+        public InventoryItem(MyItemType type)
+        {
+            Type = type;
+        }
+        public override string ToString()
+        {
+            if (!string.IsNullOrEmpty(Tag)) return $"{Tag} {Quantity}";
+            else return Quantity.ToString();
         }
     }
 
     public class InventoryUtilities : InfoUtility
     {
+        public IMyProgrammableBlock Reference;
         public static string myObjectBuilderString = "MyObjectBuilder";
+        public string Section;
         public static List<IMyTerminalBlock>InventoryBlocks = new List<IMyTerminalBlock>();
-        public Dictionary<long, MyItemType[]> ItemStorage = new Dictionary<long, MyItemType[]>();
+        public Dictionary<long, InventoryItem[]> ItemStorage = new Dictionary<long, InventoryItem[]>();
 
-        string[] ammoNames = new string[]
+        public InventoryUtilities(MyGridProgram program, string sect)
         {
-            "[ACN",
-            "[GAT",
-            "[RKT",
-            "[ASL",
-            "[ART",
-            "[SRG",
-            "[LRG"
-        };
+            Section = sect;
+            Reference = program.Me;      
+        }
 
         #region inventorystuff
         //--------------------------------------------------
@@ -319,55 +354,77 @@ namespace IngameScript
         //      MyObjectBuilder_PhysicalGunObject/WelderItem
         #endregion
 
-        public static bool TryGetItem<T>(T block, ref MyItemType itemType, ref int total)
-            where T : IMyEntity
+        public bool TryGetItem<T>(ref List<T> blocks, ref InventoryItem item)
+            where T : IMyTerminalBlock
         {
-            var initial = total;
-            if (block.HasInventory)
-            {
-                var inventory = block.GetInventory();
-                if (!inventory.ContainItems(1, itemType))
-                    return false;
-                total += inventory.GetItemAmount(itemType).ToIntSafe();
-            }
-            if (initial == total)
-                return false;
-            return true;
-        }
-        public static bool TryGetItem<T>(T block, ref MyItemType[] items, ref int total)
-            where T : IMyEntity
-        {
-            var initial = total;
-            if (block.HasInventory)
-            {
-                var inventory = block.GetInventory();
-            foreach (var item in items)
+            int amount = 0;
+            foreach (var block in blocks)
+                if (block.HasInventory && block.IsSameConstructAs(Reference))
                 {
-                    if (!inventory.ContainItems(1, item))
-                        return false;
-                    total += inventory.GetItemAmount(item).ToIntSafe();
+                    var inventory = block.GetInventory();
+                    if (!inventory.ContainItems(1, item.Type))
+                        continue;
+                    amount += inventory.GetItemAmount(item.Type).ToIntSafe();
                 }
-            }
-            if (initial == total)
-                return false;
+            if (amount == 0) return false;
+            item.Quantity = amount; 
             return true;
         }
 
-        public static bool TryGetUseRate<T>(ref MyItemType item, ref Queue<double> storage, ref List<T> blocks, out double rate)
-            where T : IMyEntity
+        public bool TryGetUseRate<T>(ref InventoryItem item, ref Queue<double> storage, ref List<T> blocks, out double rate)
+            where T : IMyTerminalBlock
         {       
             if (storage.Count == 10) // whatever
                 storage.Dequeue();
-            var amt = 0;
             rate = 0d;
-            foreach (var block in blocks)
-               TryGetItem(block, ref item, ref amt);
-            storage.Enqueue(amt);
+            TryGetItem(ref blocks, ref item);
+            storage.Enqueue(item.Quantity);
             if (storage.Count < 10)
                 return false;
             rate = (storage.First() - storage.Last()) / 2;
             if (rate < 0) return false;
             return true;
+        }
+
+        public void AddItemGroup(long id, string key)
+        {
+            Parser parser = new Parser();
+            MyIniParseResult result;
+            if (parser.TryParseCustomData(Reference, out result))
+                if (parser.ContainsKey(Section, key))
+                {
+                    var s = parser.ParseString(Section, key).Split('\n');
+                    if (s.Length > 0)
+                    {
+                        var array = new InventoryItem[s.Length];
+                        for (int i = 0; i < s.Length; i++)
+                            array[i] = new InventoryItem(s[i].Split(commandSplit));
+                        ItemStorage.Add(id, array);
+                    }
+                }
+        }
+
+        public void UpdateItemGroup(long id, ref string data)
+        {
+            data = ItemStorage[id][0].ToString();
+            if (ItemStorage[id].Length == 1)
+            {
+                if (TryGetItem(ref InventoryBlocks, ref ItemStorage[id][0]))
+                {
+                    data = ItemStorage[id][0].ToString();
+                    return;
+                }
+            }
+            else if (ItemStorage[id].Length > 1)
+            {
+                if (TryGetItem(ref InventoryBlocks, ref ItemStorage[id][0]))
+                {
+                    data = ItemStorage[id][0].ToString();
+                    for (int i = 1; i < ItemStorage[id].Length; i++)
+                        data += '\n' + ItemStorage[id][i].ToString();
+                    return;
+                }
+            }
         }
 
         #region InfoUtility
@@ -381,102 +438,60 @@ namespace IngameScript
 
         public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands)
         {
-            commands.Add("!ammo", (b) =>
-            {
-                var amt = 0;
-
-                if (justStarted)
-                {
-                    b.Data = b.Data.Trim();
-                    var ammos = new string[]
-                    {
-                    "AutocannonClip",
-                    "NATO_25x184mm",
-                    "Missile200mm",
-                    "MediumCalibreAmmo",
-                    "LargeCalibreAmmo",
-                    "SmallRailgunAmmo",
-                    "LargeRailgunAmmo"
-                    };
-                    foreach (var ammo in ammos)
-                        if (b.Data == ammo)
-                            ItemStorage.Add(b.UniqueID, new MyItemType[] { new MyItemType($"{myObjectBuilderString}_AmmoMagazine", ammo) });
-                    //throw new Exception(" DIE");
-                    //if (ammoType == null) ammoType = MyItemType.MakeAmmo(ammos[1]); this seem return null....
-
-                }
-                foreach (var block in InventoryBlocks)
-                    TryGetItem(block, ref ItemStorage[b.UniqueID][0], ref amt);
-                b.Data = amt.ToString();
-
-                if (!b.UseStringBuilder)
-                    return;
-
-                if (b.BuilderPrepend.Length > 0)
-                    b.Data = $"{b.BuilderPrepend} {b.Data}";
-
-                if (b.BuilderAppend.Length > 0)
-                    b.Data = $"{b.Data} {b.BuilderAppend}";
-            });
-            commands.Add("!ammos", (b) =>
-            {
-                if (!b.UseStringBuilder)
-                    return;
-
-                if (justStarted)
-                {
-                    var ammos = new string[]
-                    {
-                    "AutocannonClip",
-                    "NATO_25x184mm",
-                    "Missile200mm",
-                    "MediumCalibreAmmo",
-                    "LargeCalibreAmmo",
-                    "SmallRailgunAmmo",
-                    "LargeRailgunAmmo"
-                    };
-                    ItemStorage.Add(b.UniqueID, new MyItemType[7]);
-                    for (int i = 0; i < 6; ++i) //it's okay!! becausawe im drunk
-                        ItemStorage[b.UniqueID][i] = new MyItemType($"{myObjectBuilderString}_AmmoMagazine", ammos[i]);
-                }
-                for (int i = 0; i < 6; ++i)
-                {
-                    var amt = 0;
-                    foreach (var block in InventoryBlocks)
-                    {
-                        TryGetItem(block, ref ItemStorage[b.UniqueID][i], ref amt);
-                    }
-
-                    if (amt > 0)
-                    {
-                        var data = amt.ToString();
-                        Builder.AppendLine($"{ammoNames[i]} {data}{b.BuilderAppend}");
-                    }
-                }
-
-                b.Data = Builder.ToString();
-                Builder.Clear();
-            });
-
             commands.Add("!item", (b) =>
             {
-                var amt = 0;
-                MyItemType itemType = new MyItemType();
-                if (justStarted)
+                MyItemType itemType;
+                if (justStarted && !ItemStorage.ContainsKey(b.UniqueID))
                     if (b.Data.Contains(commandSplit))
                     {
                         b.Data = b.Data.Trim();
                         var stringParts = b.Data.Split(commandSplit);
                         itemType = new MyItemType($"{myObjectBuilderString}_{stringParts[0]}", stringParts[1]);
+                        var item = new InventoryItem[] { new InventoryItem(itemType) };
+                        ItemStorage.Add(b.UniqueID, item);
                     }
-                foreach (var block in InventoryBlocks)
-                    TryGetItem(block, ref itemType, ref amt);
-                b.Data = amt.ToString();
+                    else throw new Exception("LOLE");
+                UpdateItemGroup(b.UniqueID, ref b.Data);
+            });
+            commands.Add("!ores", (b) =>
+            {
+                if (justStarted && !ItemStorage.ContainsKey(b.UniqueID))
+                    AddItemGroup(b.UniqueID, "ores");
+                UpdateItemGroup(b.UniqueID, ref b.Data);
+            });
+
+            commands.Add("!ingots", (b) =>
+            {
+                if (justStarted && !ItemStorage.ContainsKey(b.UniqueID))
+                    AddItemGroup(b.UniqueID, "ingots");
+                UpdateItemGroup(b.UniqueID, ref b.Data);
+            });
+            commands.Add("debug", (b) =>
+            {
+                string debug = string.Empty;
+                foreach (var kvp in ItemStorage)
+                {
+                    var item = kvp.Value[0];
+                    var s  = kvp.Key.ToString();
+                    debug += s[0]+ "..." + s.Substring(10) + " " + item.Type.SubtypeId.ToUpper() + ", " + TryGetItem(ref InventoryBlocks, ref item) + '\n';
+                } b.Data = debug;
+            });
+            commands.Add("!ammos", (b) =>
+            {
+                if (justStarted && !ItemStorage.ContainsKey(b.UniqueID))
+                    AddItemGroup(b.UniqueID, "ammos");
+                UpdateItemGroup(b.UniqueID, ref b.Data);
             });
         }
 
         #endregion
     }
+
+    //public class BlockUtilities : InfoUtility
+    //{
+
+    //}
+
     public class FlightUtilities : InfoUtility
     {
         //IMyCubeGrid Ship; //fuvckoff
@@ -541,11 +556,15 @@ namespace IngameScript
 
     public class PowerUtilities : InfoUtility
     {
+        InventoryUtilities Inventory;
         List<IMyBatteryBlock> Batteries = new List<IMyBatteryBlock>();
         List<IMyReactor> Reactors = new List<IMyReactor>();
-        MyItemType uraniumIngot = new MyItemType($"{InventoryUtilities.myObjectBuilderString}_Ingot", "Uranium");
+        InventoryItem uraniumIngot = new InventoryItem(new MyItemType($"{InventoryUtilities.myObjectBuilderString}_Ingot", "Uranium"));
         Queue<double> savedUranium = new Queue<double>(10);
-
+        public PowerUtilities(InventoryUtilities inventory)
+        {
+            Inventory = inventory;
+        }
         #region InfoUtility
         public override void Reset(MyGridProgram program)
         {
@@ -562,7 +581,7 @@ namespace IngameScript
             commands.Add("!fissionrate", (b) =>
             {
                 var rate = 0d;
-                b.Data = InventoryUtilities.TryGetUseRate(ref uraniumIngot, ref savedUranium, ref Reactors, out rate) ? $"{rate:000.0} kg/s" : "0 kg/s";
+                b.Data = Inventory.TryGetUseRate(ref uraniumIngot, ref savedUranium, ref Reactors, out rate) ? $"{rate:000.0} kg/s" : "0 kg/s";
             });
         }
         #endregion

@@ -201,10 +201,10 @@ namespace IngameScript
                                         sprite.UseStringBuilder = myParser.ParseBool(nametag, Keys.BuilderKey);
                                     // >PREPEND
                                     if (sprite.UseStringBuilder && myParser.ContainsKey(nametag, Keys.PrependKey))
-                                        sprite.BuilderPrepend = myParser.ParseString(nametag, Keys.PrependKey);
+                                        sprite.BuilderPrepend = myParser.ParseString(nametag, Keys.PrependKey) + " ";
                                     // >APPEND
                                     if (sprite.UseStringBuilder && myParser.ContainsKey(nametag, Keys.AppendKey))
-                                        sprite.BuilderAppend = myParser.ParseString(nametag, Keys.AppendKey);
+                                        sprite.BuilderAppend = " " + myParser.ParseString(nametag, Keys.AppendKey);
 
                                     sprite.CommandString = sprite.CommandFrequency == SharedUtilities.defaultUpdate ? "" : myParser.ParseString(nametag, Keys.CommandKey, "!def");
                                     CommandUsers[thisSurface].Add(sprite.Name);
@@ -314,7 +314,11 @@ namespace IngameScript
                     //Program.Me.CustomData += $"UPDATED {display}, {Program.Runtime.TimeSinceLastRun}\n";
                     foreach (var name in display.Value.Keys)
                         if (CommandUsers[display.Key].Contains(name) && (display.Value[name].CommandFrequency & sourceFreqFlags) != 0) //is command frequency the same as frequency of update source?
-                            display.Value[name].Command.Invoke(display.Value[name]);                                                   //i.e. do we run command on this tick
+                        {
+                            display.Value[name].Command.Invoke(display.Value[name]);
+                            if (display.Value[name].UseStringBuilder)
+                                InfoUtility.ApplyBuilder(display.Value[name]);
+                        }//i.e. do we run command on this tick
                     var frame = display.Key.DrawFrame();
                     var piss = display.Key.TextureSize * 0.5f;
                     foreach (var sprite in display.Value)

@@ -88,7 +88,7 @@ namespace IngameScript
             {
                 Keys.ResetKeys(); // lol. lmao
                 List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
-                TerminalSystem.GetBlockGroupWithName("LCT Screen Control").GetBlocks(blocks);
+                TerminalSystem.GetBlockGroupWithName("SWT Screen Control").GetBlocks(blocks);
                 foreach (var block in blocks)
                 {
                     var display = new LinkedDisplay(block, ref Commands, ref Program, ref Keys);
@@ -99,6 +99,7 @@ namespace IngameScript
                         Program.Echo($"SURFACE {surface.Key.DisplayName} LOADED\n");
                         Program.Echo($"SURFACE UPDATE {display.DisplayRefreshFreqencies[surface.Key]}");
                     }
+                    //block.CustomData = SharedUtilities.EncodeSprites(ref display);
                 }
             }
 
@@ -139,6 +140,7 @@ namespace IngameScript
                                 break;
                             }
                         }
+
                     default: { break; }
                 }
             }

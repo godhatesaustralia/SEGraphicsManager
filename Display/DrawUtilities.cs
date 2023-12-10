@@ -52,6 +52,30 @@ namespace IngameScript
             else if (sprite.SpriteSizeY > sprite.SpriteSizeX)
                 sprite.SpriteSizeY *= pctData;
         }
+
+        public static string EncodeSprites(ref LinkedDisplay display)
+        // the idea: have this make the requisite SpriteData constructors here bc im too lazy
+        // the constructor in question:
+        //  public SpriteData(SpriteType type, string name, string data, float sizeX, float sizeY, TextAlignment alignment,
+        //  float posX, float posY, float ros, Color color, string fontid = "White", UpdateFrequency updateType = UpdateFrequency.None,
+        //  string command = "", bool builder = false, string prepend = "") (jesus christ)
+        {
+            var encodedOutput = "";
+            var comma = ", ";
+            foreach (var surface in display.DisplayOutputs)
+            {
+                encodedOutput += $"// screen {surface.Key.Name} background color {surface.Key.BackgroundColor}\n";
+                foreach (var sprite in surface.Value.Values)
+                {
+                    encodedOutput += $"new SpriteData({sprite.spriteType}, {sprite.Name}, {sprite.Data}, {(sprite.spriteType != SpriteType.TEXT ? sprite.SpriteSizeX + comma + sprite.SpriteSizeY + comma : "")}" +
+                        $"TextAlignment.{sprite.SpriteAlignment.ToString().ToUpper()}, {sprite.SpritePosX}, {sprite.SpritePosY}, " +
+                        $"{sprite.SpriteRorS}, new Color({sprite.SpriteColor.R}, {sprite.SpriteColor.G}, {sprite.SpriteColor.B}, {sprite.SpriteColor.A}){(sprite.spriteType != SpriteType.TEXT ? "" : comma + sprite.FontID)}" +
+                        $"{(sprite.CommandFrequency != UpdateFrequency.None ? comma + sprite.CommandFrequency.ToString() + comma + sprite.CommandString + comma + sprite.UseStringBuilder + (sprite.UseStringBuilder ? comma + sprite.BuilderPrepend + comma + sprite.BuilderAppend : "") : "")});\n";
+                }
+            }
+            return encodedOutput;
+        }
+
     }
 
     public class DisplayIniKeys //avoid allocating new memory for every display (i hope). just seems less retarded.
@@ -97,6 +121,7 @@ namespace IngameScript
             PrependKey = "K_PREP";
             AppendKey = "K_APP";
         }
+
 
     }
 }

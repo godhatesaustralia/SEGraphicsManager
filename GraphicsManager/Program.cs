@@ -23,7 +23,6 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
         public GraphicsManager Manager;
-
         public Program()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
@@ -32,10 +31,12 @@ namespace IngameScript
             Manager.useCustomDisplays = true;
             Manager.Keys = new DisplayIniKeys();
 
-            Manager.Utilities.Add(new GasUtilities());
-            Manager.Utilities.Add(new InventoryUtilities());
+            
+            InventoryUtilities inv = new InventoryUtilities(this, "GCM");
+            Manager.Utilities.Add(inv);
             Manager.Utilities.Add(new FlightUtilities());
-            Manager.Utilities.Add(new PowerUtilities());
+            Manager.Utilities.Add(new GasUtilities(inv));
+            Manager.Utilities.Add(new PowerUtilities(inv));
             Manager.Init();
         }
 

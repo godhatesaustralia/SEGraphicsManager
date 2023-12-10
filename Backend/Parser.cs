@@ -81,7 +81,7 @@ namespace IngameScript
             a = HexParse(aDefault, 6, 2);
             return new Color(r, g, b, a);
         }
-        public byte HexParse(string input, int start, int length)
+        private byte HexParse(string input, int start, int length)
         {
             return Convert.ToByte(input.Substring(start, length), 16);
 
