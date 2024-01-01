@@ -30,13 +30,14 @@ namespace IngameScript
         #region fields
 
         public static bool justStarted;
-        internal MyGridProgram Program;
-        internal IMyGridTerminalSystem TerminalSystem;
-        internal const char
+        protected MyGridProgram Program;
+        protected IMyGridTerminalSystem TerminalSystem;
+        protected const char
             commandSplit = '!',
             space = ' ';
-        internal string invalid = "••";
-        internal StringBuilder Builder;
+        protected string invalid = "••";
+        protected StringBuilder Builder;
+        protected double bad = double.NaN;
         public static void ApplyBuilder(SpriteData d)
         {
             StringBuilder builder = new StringBuilder(d.Data);
@@ -46,7 +47,7 @@ namespace IngameScript
                 builder.Append(d.BuilderAppend);
             d.Data = builder.ToString();
         }
-        internal TimeSpan DeltaT
+        protected TimeSpan DeltaT
         {
             get
             {
@@ -122,7 +123,7 @@ namespace IngameScript
         }
 
         #endregion
-        public double HydrogenStatus()
+        double HydrogenStatus()
         {
             var amt = 0d;
             var total = amt;
@@ -134,7 +135,7 @@ namespace IngameScript
             return amt / total;
         }
 
-        public double OxygenStatus()
+        double OxygenStatus()
         {
             var amt = 0d;
             var total = amt;
@@ -146,7 +147,7 @@ namespace IngameScript
             return amt / total;
         }
 
-        public string HydrogenTime()
+        string HydrogenTime()
         {
             var pct = HydrogenStatus();
             //program.Me.CustomData += $"PCT {pct}\n";
@@ -386,7 +387,7 @@ namespace IngameScript
             return true;
         }
 
-        public void AddItemGroup(long id, string key)
+        void AddItemGroup(long id, string key)
         {
             Parser parser = new Parser();
             MyIniParseResult result;
@@ -404,7 +405,7 @@ namespace IngameScript
                 }
         }
 
-        public void UpdateItemGroup(long id, ref string data)
+        void UpdateItemGroup(long id, ref string data)
         {
             data = ItemStorage[id][0].ToString();
             if (ItemStorage[id].Length == 1)
@@ -514,9 +515,22 @@ namespace IngameScript
 
         public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands)
         {
-            commands.Add("!horiz", (b) => b.Data = GetHorizonAngle());
-            commands.Add("!seaalt", (b) => b.Data = GetAlt(MyPlanetElevation.Sealevel));
-            commands.Add("!suralt", (b) => b.Data = GetAlt(MyPlanetElevation.Surface));
+            commands.Add("!horiz", (b) =>
+            {
+                var aoa = GetHorizonAngle();
+                b.Data = aoa != bad ? MathHelper.ToDegrees(aoa).ToString("-#0.##; +#0.##") + "°" : invalid;
+
+            });
+            commands.Add("!seaalt", (b) => 
+            {
+                var alt = GetAlt(MyPlanetElevation.Sealevel);
+                b.Data = alt != bad ? $"{alt:0000} m" : invalid;
+            });
+            commands.Add("!suralt", (b) => 
+            {
+                var alt = GetAlt(MyPlanetElevation.Surface);
+                b.Data = alt != bad ? $"{alt:0000} m" : invalid;
+            });
         }
         #endregion
 
@@ -532,25 +546,29 @@ namespace IngameScript
             return true;
         }
 
-        public string GetHorizonAngle()
+        double GetHorizonAngle()
         {
             var grav = VZed; // Vector3D.Zero         
             if (!GravCheck(out grav))
-                return invalid;
+                return bad;
             grav.Normalize();
-            var aoa = Math.Asin(MathHelper.Clamp(Controller.WorldMatrix.Forward.Dot(grav), -1, 1));
-            return MathHelper.ToDegrees(aoa).ToString("-#0.##; +#0.##") + "°";
+            return Math.Asin(MathHelper.Clamp(Controller.WorldMatrix.Forward.Dot(grav), -1, 1));
         }
 
-        public string GetAlt(MyPlanetElevation elevation)
+        double GetAlt(MyPlanetElevation elevation)
         {
             var grav = VZed; // Vector3D.Zero         
             if (!GravCheck(out grav))
-                return invalid;
+                return bad;
             var alt = 0d;
             if (Controller.TryGetPlanetElevation(elevation, out alt))
-                return $"{alt:0000} m";
-            return invalid;
+                return alt;
+            return bad;
+        }
+
+        double StoppingDist()
+        {
+            return bad;
         }
     }
 
@@ -577,7 +595,11 @@ namespace IngameScript
 
         public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands)
         {
-            commands.Add("!battcharge", (b) => b.Data = BatteryCharge());
+            commands.Add("!battcharge", (b) => 
+            { 
+                var batt = BatteryCharge();
+                b.Data = batt != bad ? batt.ToString("#0.##%") : invalid;
+            });
             commands.Add("!fissionrate", (b) =>
             {
                 var rate = 0d;
@@ -585,10 +607,10 @@ namespace IngameScript
             });
         }
         #endregion
-        public string BatteryCharge()
+        public double BatteryCharge()
         {
             if (Batteries.Count == 0) 
-                return invalid;
+                return bad;
             var charge = 0d;
             var total = charge;
             foreach ( var battery in Batteries)
@@ -596,7 +618,7 @@ namespace IngameScript
                 charge += battery.CurrentStoredPower;
                 total += battery.MaxStoredPower;
             }
-            return (charge / total).ToString("#0.##%");
+            return (charge / total);
         }
     }
 }
