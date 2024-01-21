@@ -1,5 +1,7 @@
-﻿using Sandbox.Game.Entities;
+﻿using Sandbox.Game;
+using Sandbox.Game.Entities;
 using Sandbox.Game.EntityComponents;
+using Sandbox.Game.GameSystems;
 using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
 using SpaceEngineers.Game.ModAPI.Ingame;
@@ -30,6 +32,7 @@ namespace IngameScript
         #region fields
 
         public static bool justStarted;
+        public static Dictionary<long, MyTuple<bool, float>> GraphStorage = new Dictionary<long, MyTuple<bool, float>>();
         protected MyGridProgram Program;
         protected IMyGridTerminalSystem TerminalSystem;
         protected const char
@@ -105,15 +108,20 @@ namespace IngameScript
         public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands) 
         {           //i fucking hate this, this sucks ass
             commands.Add("!h2%", (b) =>
-            b.Data = HydrogenStatus().ToString("#0.##%"));
+            b.Data = HydrogenStatus().ToString("#0.#%"));
 
             commands.Add("!o2%", (b) =>
-                b.Data = OxygenStatus().ToString("#0.##%"));
+                b.Data = OxygenStatus().ToString("#0.#%"));
+
+            commands.Add("!h2b", (b) =>
+                SharedUtilities.UpdateBarGraph(ref b, HydrogenStatus()));
+
+            commands.Add("!o2b", (b) =>
+                SharedUtilities.UpdateBarGraph(ref b, OxygenStatus()));
 
             commands.Add("!h2t", (b) =>
                 b.Data = HydrogenTime());
                 
-
             commands.Add("!ice", (b) =>
             {// ONLY USE WITH UPDATE100
                 var rate = 0d;
@@ -422,7 +430,10 @@ namespace IngameScript
                 {
                     data = ItemStorage[id][0].ToString();
                     for (int i = 1; i < ItemStorage[id].Length; i++)
+                    {
+                        TryGetItem(ref InventoryBlocks, ref ItemStorage[id][i]);
                         data += '\n' + ItemStorage[id][i].ToString();
+                    }
                     return;
                 }
             }
@@ -477,6 +488,14 @@ namespace IngameScript
                     debug += s[0]+ "..." + s.Substring(10) + " " + item.Type.SubtypeId.ToUpper() + ", " + TryGetItem(ref InventoryBlocks, ref item) + '\n';
                 } b.Data = debug;
             });
+
+            commands.Add("!components", (b) =>
+            {
+                if (justStarted && !ItemStorage.ContainsKey(b.UniqueID))
+                    AddItemGroup(b.UniqueID, "components");
+                UpdateItemGroup(b.UniqueID, ref b.Data);
+            });
+
             commands.Add("!ammos", (b) =>
             {
                 if (justStarted && !ItemStorage.ContainsKey(b.UniqueID))
@@ -497,7 +516,8 @@ namespace IngameScript
     {
         //IMyCubeGrid Ship; //fuvckoff
         IMyShipController Controller;
-        Vector3D VZed = Vector3D.Zero;
+        double lastDist;
+        Vector3D VZed = Vector3D.Zero, last;
 
         #region InfoUtility
 
@@ -519,17 +539,24 @@ namespace IngameScript
             {
                 var aoa = GetHorizonAngle();
                 b.Data = aoa != bad ? MathHelper.ToDegrees(aoa).ToString("-#0.##; +#0.##") + "°" : invalid;
-
             });
+
             commands.Add("!seaalt", (b) => 
             {
                 var alt = GetAlt(MyPlanetElevation.Sealevel);
                 b.Data = alt != bad ? $"{alt:0000} m" : invalid;
             });
+
             commands.Add("!suralt", (b) => 
             {
                 var alt = GetAlt(MyPlanetElevation.Surface);
                 b.Data = alt != bad ? $"{alt:0000} m" : invalid;
+            });
+
+            commands.Add("!stopdist", (b) =>
+            {
+                var dist = StoppingDist();
+                b.Data = $"{dist:0000}"; 
             });
         }
         #endregion
@@ -568,7 +595,20 @@ namespace IngameScript
 
         double StoppingDist()
         {
-            return bad;
+            var ret = lastDist;
+            var current = Controller.GetShipVelocities().LinearVelocity;
+            if (!justStarted && current != VZed)
+            {
+                var mag = (last - current).Length();
+                if (mag > 0.01)
+                {
+                    var accel = (last - current).Length() / DeltaT.TotalSeconds;
+                    ret = current.Length() * current.Length() / (2 * accel);
+                    lastDist = ret;
+                }
+            }
+            last = current;
+            return ret;
         }
     }
 
@@ -577,6 +617,7 @@ namespace IngameScript
         InventoryUtilities Inventory;
         List<IMyBatteryBlock> Batteries = new List<IMyBatteryBlock>();
         List<IMyReactor> Reactors = new List<IMyReactor>();
+        List<IMyPowerProducer> Generators = new List<IMyPowerProducer>();
         InventoryItem uraniumIngot = new InventoryItem(new MyItemType($"{InventoryUtilities.myObjectBuilderString}_Ingot", "Uranium"));
         Queue<double> savedUranium = new Queue<double>(10);
         public PowerUtilities(InventoryUtilities inventory)
@@ -589,14 +630,16 @@ namespace IngameScript
             base.Reset(program);
             Batteries.Clear();
             Reactors.Clear();
+            Generators.Clear();
             TerminalSystem.GetBlocksOfType(Batteries, (battery) => battery.IsSameConstructAs(program.Me));
             TerminalSystem.GetBlocksOfType(Reactors, (reactor) => reactor.IsSameConstructAs(program.Me));
+            TerminalSystem.GetBlocksOfType(Generators, (generator) => generator.IsSameConstructAs(program.Me));
         }
 
         public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands)
         {
-            commands.Add("!battcharge", (b) => 
-            { 
+            commands.Add("!battcharge", (b) =>
+            {
                 var batt = BatteryCharge();
                 b.Data = batt != bad ? batt.ToString("#0.##%") : invalid;
             });
@@ -607,18 +650,77 @@ namespace IngameScript
             });
         }
         #endregion
-        public double BatteryCharge()
+        double BatteryCharge()
         {
-            if (Batteries.Count == 0) 
+            if (Batteries.Count == 0)
                 return bad;
             var charge = 0d;
             var total = charge;
-            foreach ( var battery in Batteries)
+            foreach (var battery in Batteries)
             {
                 charge += battery.CurrentStoredPower;
                 total += battery.MaxStoredPower;
             }
             return (charge / total);
         }
+
+    }
+
+    // TODO: THIS SYSTEM IS ASS
+    public class WeaponUtilities : InfoUtility
+    {
+        Dictionary<long, IMyTerminalBlock[]> WeaponGroups = new Dictionary<long, IMyTerminalBlock[]>();
+        WCPBAPI api = null;
+        string tag;
+
+        public WeaponUtilities(string t)
+        {
+            tag = t;
+        }
+
+        #region InfoUtility
+        public override void Reset(MyGridProgram program)
+        {
+            base.Reset(program);
+            WCPBAPI.Activate(Program.Me, ref api);
+            WeaponGroups.Clear();
+        }
+
+        public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands)
+        {
+            commands.Add("!weaponcharge%", (b) =>
+            {
+                if (justStarted) AddWeaponGroup(b);
+                if (WeaponGroups.ContainsKey(b.UniqueID))
+                    UpdateWeaponCharge(ref b);
+            });
+
+        }
+
+        #endregion
+
+        void AddWeaponGroup(SpriteData d)
+        {
+            var list = new List<IMyTerminalBlock>();
+            TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
+            {
+                if (b.IsSameConstructAs(Program.Me) && b.CustomName.Contains(d.Data))
+                    list.Add(b);
+                return true;
+            });
+            if (list.Count > 0) WeaponGroups.Add(d.UniqueID, list.ToArray());
+        }
+
+        void UpdateWeaponCharge(ref SpriteData d)
+        {
+            d.Data = WeaponGroups[d.UniqueID][0].CustomName.ToUpper().TrimStart(tag.ToCharArray()) + (!api.IsWeaponReadyToFire(WeaponGroups[d.UniqueID][0]) ? " CYCLE" : " RDY");
+
+            if (WeaponGroups[d.UniqueID].Length > 1)
+            {
+                for (int i = 1; i < WeaponGroups[d.UniqueID].Length; i++)
+                    d.Data += '\n' + WeaponGroups[d.UniqueID][i].CustomName.ToUpper().TrimStart(tag.ToCharArray()) + (!api.IsWeaponReadyToFire(WeaponGroups[d.UniqueID][0]) ? " CYCLE" : " RDY");
+                }
+            }
+
     }
 }

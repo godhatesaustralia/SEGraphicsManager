@@ -1,5 +1,6 @@
 ﻿using Sandbox.Engine.Platform.VideoMode;
 using Sandbox.Game.EntityComponents;
+using Sandbox.Gui;
 using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
 using SpaceEngineers.Game.ModAPI.Ingame;
@@ -38,6 +39,7 @@ namespace IngameScript
         Frame,
         RuntimeMSRounded;
         public double RuntimeMS;
+        public string tag;
 
         public Dictionary<string, Action<SpriteData>> Commands;
         public HashSet<DisplayBase> Displays;
@@ -61,6 +63,11 @@ namespace IngameScript
             AllBlocks = new List<IMyTerminalBlock>();
             Builder = new StringBuilder();
             Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            var p = new Parser();
+            var result = new MyIniParseResult();
+            if (p.TryParseCustomData(Me, out result))
+                tag = p.ParseString("GCM", "tag");
+            else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
         }
 
         public void Clear()
@@ -88,7 +95,7 @@ namespace IngameScript
             {
                 Keys.ResetKeys(); // lol. lmao
                 List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
-                TerminalSystem.GetBlockGroupWithName("SWT Screen Control").GetBlocks(blocks);
+                TerminalSystem.GetBlockGroupWithName(tag + " Screen Control").GetBlocks(blocks);
                 foreach (var block in blocks)
                 {
                     var display = new LinkedDisplay(block, ref Commands, ref Program, ref Keys);

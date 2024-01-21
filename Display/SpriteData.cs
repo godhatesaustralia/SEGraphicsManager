@@ -19,7 +19,8 @@ namespace IngameScript
             SpriteSizeY,
             SpritePosX,
             SpritePosY,
-            SpriteRorS;
+            SpriteRorS,
+            SpriteLength;
         public string
             Name,
             Data,

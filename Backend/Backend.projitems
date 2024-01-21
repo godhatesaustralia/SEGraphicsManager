@@ -13,5 +13,6 @@
     <Compile Include="$(MSBuildThisFileDirectory)GraphicsManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Info.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Parser.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)WCPBAPI.cs" />
   </ItemGroup>
 </Project>
