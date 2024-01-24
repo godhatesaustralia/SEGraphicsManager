@@ -375,7 +375,7 @@ namespace IngameScript
                         continue;
                     amount += inventory.GetItemAmount(item.Type).ToIntSafe();
                 }
-            if (amount == 0) return false;
+            if (amount == 0) return true;
             item.Quantity = amount; 
             return true;
         }
@@ -558,6 +558,11 @@ namespace IngameScript
                 var dist = StoppingDist();
                 b.Data = $"{dist:0000}"; 
             });
+
+            commands.Add("!damp", (b) =>
+            {
+                b.Data = Controller.DampenersOverride ? "ON" : "OFF";
+            });
         }
         #endregion
 
@@ -617,7 +622,7 @@ namespace IngameScript
         InventoryUtilities Inventory;
         List<IMyBatteryBlock> Batteries = new List<IMyBatteryBlock>();
         List<IMyReactor> Reactors = new List<IMyReactor>();
-        List<IMyPowerProducer> Generators = new List<IMyPowerProducer>();
+        List<IMyPowerProducer> Engines = new List<IMyPowerProducer>();
         InventoryItem uraniumIngot = new InventoryItem(new MyItemType($"{InventoryUtilities.myObjectBuilderString}_Ingot", "Uranium"));
         Queue<double> savedUranium = new Queue<double>(10);
         public PowerUtilities(InventoryUtilities inventory)
@@ -630,10 +635,10 @@ namespace IngameScript
             base.Reset(program);
             Batteries.Clear();
             Reactors.Clear();
-            Generators.Clear();
+            Engines.Clear();
             TerminalSystem.GetBlocksOfType(Batteries, (battery) => battery.IsSameConstructAs(program.Me));
             TerminalSystem.GetBlocksOfType(Reactors, (reactor) => reactor.IsSameConstructAs(program.Me));
-            TerminalSystem.GetBlocksOfType(Generators, (generator) => generator.IsSameConstructAs(program.Me));
+            TerminalSystem.GetBlocksOfType(Engines, (generator) => generator.IsSameConstructAs(program.Me) && generator.CustomName.Contains("Engine"));
         }
 
         public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands)
@@ -641,13 +646,37 @@ namespace IngameScript
             commands.Add("!battcharge", (b) =>
             {
                 var batt = BatteryCharge();
-                b.Data = batt != bad ? batt.ToString("#0.##%") : invalid;
+                b.Data = batt != bad ? batt.ToString("#0.#%") : invalid;
             });
+
+            commands.Add("!battchargeb", (b) =>
+            {
+            SharedUtilities.UpdateBarGraph(ref b, BatteryCharge());
+            });
+
             commands.Add("!fissionrate", (b) =>
             {
                 var rate = 0d;
-                b.Data = Inventory.TryGetUseRate(ref uraniumIngot, ref savedUranium, ref Reactors, out rate) ? $"{rate:000.0} kg/s" : "0 kg/s";
+                b.Data = Inventory.TryGetUseRate(ref uraniumIngot, ref savedUranium, ref Reactors, out rate) ? $"{rate:000.0} KG/S" : "0 KG/S";
             });
+
+            commands.Add("!reactorstat", (b) =>
+            {
+                int count = 0;
+
+                foreach (var reactor in Reactors)
+                    if (reactor.Enabled) count++;
+                b.Data = Reactors.Count > 1  ? $"{count}/{Reactors.Count} ON" : "ON";
+            });
+
+            commands.Add("enginestat", (b) =>
+            {
+                int count = 0;
+                foreach (var reactor in Engines)
+                    if (reactor.Enabled) count++;
+                b.Data = Engines.Count > 1 ? $"{count}/{Engines.Count} ON" : "ON";
+            });
+
         }
         #endregion
         double BatteryCharge()
@@ -669,7 +698,7 @@ namespace IngameScript
     // TODO: THIS SYSTEM IS ASS
     public class WeaponUtilities : InfoUtility
     {
-        Dictionary<long, IMyTerminalBlock[]> WeaponGroups = new Dictionary<long, IMyTerminalBlock[]>();
+        Dictionary<long, MyTuple<string, IMyTerminalBlock[]>> WeaponGroups = new Dictionary<long, MyTuple<string, IMyTerminalBlock[]>>();
         WCPBAPI api = null;
         string tag;
 
@@ -702,25 +731,23 @@ namespace IngameScript
         void AddWeaponGroup(SpriteData d)
         {
             var list = new List<IMyTerminalBlock>();
+            string[] dat = d.Data.Split(commandSplit);
             TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
             {
-                if (b.IsSameConstructAs(Program.Me) && b.CustomName.Contains(d.Data))
+                if (b.IsSameConstructAs(Program.Me) && b.CustomName.Contains(dat[0]))
                     list.Add(b);
                 return true;
             });
-            if (list.Count > 0) WeaponGroups.Add(d.UniqueID, list.ToArray());
+            if (list.Count > 0) WeaponGroups.Add(d.UniqueID, new MyTuple<string, IMyTerminalBlock[]>(dat[1], list.ToArray()));
         }
 
         void UpdateWeaponCharge(ref SpriteData d)
         {
-            d.Data = WeaponGroups[d.UniqueID][0].CustomName.ToUpper().TrimStart(tag.ToCharArray()) + (!api.IsWeaponReadyToFire(WeaponGroups[d.UniqueID][0]) ? " CYCLE" : " RDY");
-
-            if (WeaponGroups[d.UniqueID].Length > 1)
-            {
-                for (int i = 1; i < WeaponGroups[d.UniqueID].Length; i++)
-                    d.Data += '\n' + WeaponGroups[d.UniqueID][i].CustomName.ToUpper().TrimStart(tag.ToCharArray()) + (!api.IsWeaponReadyToFire(WeaponGroups[d.UniqueID][0]) ? " CYCLE" : " RDY");
-                }
-            }
+            int count = 0;
+            foreach (var wpn in WeaponGroups[d.UniqueID].Item2)
+                if (api.IsWeaponReadyToFire(wpn)) count++;
+            d.Data = $"{WeaponGroups[d.UniqueID].Item1} {count}/{WeaponGroups[d.UniqueID].Item2.Length} RDY";
+        }
 
     }
 }
