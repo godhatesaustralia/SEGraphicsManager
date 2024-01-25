@@ -45,14 +45,13 @@ namespace IngameScript
             return updateFrequency;
         }
 
-        public static void UpdateBarGraph(ref SpriteData data, double pctData) // will not work with square. L
+        public static void CreateBarGraph(ref SpriteData data)
         {
-            if (InfoUtility.justStarted)
-            {
-                bool horizontal = data.SpriteSizeX > data.SpriteSizeY;
-                InfoUtility.GraphStorage.Add(data.UniqueID, new MyTuple<bool, float>(horizontal, horizontal ? data.SpriteSizeX : data.SpriteSizeY));
-            }
-
+            bool horizontal = data.SpriteSizeX > data.SpriteSizeY;
+            InfoUtility.GraphStorage.Add(data.UniqueID, new MyTuple<bool, float>(horizontal, horizontal ? data.SpriteSizeX : data.SpriteSizeY));
+        }
+        public static void UpdateBarGraph(ref SpriteData data, double pctData) // will not work with square. L
+        { 
             var graph = InfoUtility.GraphStorage[data.UniqueID];
             if (graph.Item1) data.SpriteSizeX = Convert.ToSingle(pctData) * graph.Item2;
             else data.SpriteSizeY = Convert.ToSingle(pctData) * graph.Item2;

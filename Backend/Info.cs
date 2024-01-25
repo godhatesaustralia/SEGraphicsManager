@@ -66,6 +66,7 @@ namespace IngameScript
         }
         public virtual void Reset(MyGridProgram program)
         {
+            GraphStorage.Clear();
             Program = program;
             TerminalSystem = program.GridTerminalSystem;
             justStarted = true;
@@ -114,10 +115,16 @@ namespace IngameScript
                 b.Data = OxygenStatus().ToString("#0.#%"));
 
             commands.Add("!h2b", (b) =>
-                SharedUtilities.UpdateBarGraph(ref b, HydrogenStatus()));
+            {
+                if (justStarted) SharedUtilities.CreateBarGraph(ref b);
+                SharedUtilities.UpdateBarGraph(ref b, HydrogenStatus());
+            });
 
             commands.Add("!o2b", (b) =>
-                SharedUtilities.UpdateBarGraph(ref b, OxygenStatus()));
+            {
+                if (justStarted) SharedUtilities.CreateBarGraph(ref b);
+                SharedUtilities.UpdateBarGraph(ref b, OxygenStatus());
+            });
 
             commands.Add("!h2t", (b) =>
                 b.Data = HydrogenTime());
@@ -516,6 +523,7 @@ namespace IngameScript
     {
         //IMyCubeGrid Ship; //fuvckoff
         IMyShipController Controller;
+        List<IMyJumpDrive> JumpDrives = new List<IMyJumpDrive>();
         double lastDist;
         Vector3D VZed = Vector3D.Zero, last;
 
@@ -527,10 +535,11 @@ namespace IngameScript
             //Ship = program.Me.CubeGrid;
             TerminalSystem.GetBlocksOfType<IMyShipController>(null, (b) =>
             {
-                if (b.CustomName.Contains("[I]") || b.IsMainCockpit)
+                if ((b.CustomName.Contains("[I]") || b.IsMainCockpit) && b.IsSameConstructAs(Program.Me))
                     Controller = b;
                 return true;
             });
+            TerminalSystem.GetBlocksOfType(JumpDrives, (b) => b.IsSameConstructAs(Program.Me));
         }
 
         public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands)
@@ -563,6 +572,15 @@ namespace IngameScript
             {
                 b.Data = Controller.DampenersOverride ? "ON" : "OFF";
             });
+
+            commands.Add("!jumpcharge", (b) => b.Data = JumpCharge().ToString("#0.#%"));
+
+            commands.Add("!jumpchargeb", (b) =>
+            {
+                if (justStarted) SharedUtilities.CreateBarGraph(ref b);
+                SharedUtilities.UpdateBarGraph(ref b, JumpCharge());
+            });
+
         }
         #endregion
 
@@ -615,6 +633,19 @@ namespace IngameScript
             last = current;
             return ret;
         }
+
+        float JumpCharge()
+        {
+            float charge, max = 0f;
+            charge = max;
+            if (JumpDrives.Count == 0) return 0f;
+            foreach (var jd in JumpDrives)
+            {
+                charge += jd.CurrentStoredPower;
+                max += jd.MaxStoredPower;
+            }
+            return charge/max;
+        }
     }
 
     public class PowerUtilities : InfoUtility
@@ -651,7 +682,8 @@ namespace IngameScript
 
             commands.Add("!battchargeb", (b) =>
             {
-            SharedUtilities.UpdateBarGraph(ref b, BatteryCharge());
+                if (justStarted) SharedUtilities.CreateBarGraph(ref b);
+                SharedUtilities.UpdateBarGraph(ref b, BatteryCharge());
             });
 
             commands.Add("!fissionrate", (b) =>
@@ -722,6 +754,17 @@ namespace IngameScript
                 if (justStarted) AddWeaponGroup(b);
                 if (WeaponGroups.ContainsKey(b.UniqueID))
                     UpdateWeaponCharge(ref b);
+            });
+            commands.Add("!target", (b) =>
+            {
+                var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
+                b.Data = focus.HasValue ? focus.Value.Name : "NO TARGET";
+            });
+
+            commands.Add("!targetdist", (b) =>
+            {
+                var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
+                b.Data = focus.HasValue ? (focus.Value.Position - Program.Me.CubeGrid.GetPosition()).Length().ToString("4:####") : "NO TARGET";
             });
 
         }
