@@ -752,19 +752,27 @@ namespace IngameScript
             commands.Add("!weaponcharge%", (b) =>
             {
                 if (justStarted) AddWeaponGroup(b);
-                if (WeaponGroups.ContainsKey(b.UniqueID))
+                else if (WeaponGroups.ContainsKey(b.UniqueID))
                     UpdateWeaponCharge(ref b);
             });
             commands.Add("!target", (b) =>
             {
-                var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
-                b.Data = focus.HasValue ? focus.Value.Name : "NO TARGET";
+                if (api == null) { b.Data = "ERROR"; return; }
+                else
+                {
+                    var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
+                    b.Data = focus.HasValue ? focus.Value.Name : "NO TARGET";
+                }
             });
 
             commands.Add("!targetdist", (b) =>
             {
-                var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
-                b.Data = focus.HasValue ? (focus.Value.Position - Program.Me.CubeGrid.GetPosition()).Length().ToString("4:####") : "NO TARGET";
+                if (api == null) { b.Data = "ERROR"; return; }
+                else
+                {
+                    var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
+                    b.Data = focus.HasValue ? (focus.Value.Position - Program.Me.CubeGrid.GetPosition()).Length().ToString("4:####") : "NO TARGET";
+                }
             });
 
         }
@@ -786,6 +794,7 @@ namespace IngameScript
 
         void UpdateWeaponCharge(ref SpriteData d)
         {
+            if (api == null) return;
             int count = 0;
             foreach (var wpn in WeaponGroups[d.UniqueID].Item2)
                 if (api.IsWeaponReadyToFire(wpn)) count++;

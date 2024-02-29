@@ -39,7 +39,7 @@ namespace IngameScript
         Frame,
         RuntimeMSRounded;
         public double RuntimeMS;
-        public string tag;
+        public string tag, name;
 
         public Dictionary<string, Action<SpriteData>> Commands;
         public HashSet<DisplayBase> Displays;
@@ -67,6 +67,7 @@ namespace IngameScript
             var result = new MyIniParseResult();
             if (p.TryParseCustomData(Me, out result))
                 tag = p.ParseString("GCM", "tag");
+                name = p.ParseString("GCM", "group name", "Screen Control")
             else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
         }
 
@@ -95,7 +96,7 @@ namespace IngameScript
             {
                 Keys.ResetKeys(); // lol. lmao
                 List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
-                TerminalSystem.GetBlockGroupWithName(tag + " Screen Control").GetBlocks(blocks);
+                TerminalSystem.GetBlockGroupWithName(tag + " " + name).GetBlocks(blocks);
                 foreach (var block in blocks)
                 {
                     var display = new LinkedDisplay(block, ref Commands, ref Program, ref Keys);
