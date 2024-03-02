@@ -66,8 +66,10 @@ namespace IngameScript
             var p = new Parser();
             var result = new MyIniParseResult();
             if (p.TryParseCustomData(Me, out result))
+            {
                 tag = p.ParseString("GCM", "tag");
-                name = p.ParseString("GCM", "group name", "Screen Control")
+                name = p.ParseString("GCM", "group name", "Screen Control");
+            }    
             else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
         }
 
