@@ -30,11 +30,11 @@ namespace IngameScript
             Manager = new GraphicsManager(this);
             // NO TOUCH DISPLAY ;)
             Manager.useCustomDisplays = false;
-            Manager.Keys = new DisplayIniKeys();
+            Manager.Keys = new IniKeys();
 
-            Manager.Utilities.Add(new GasUtilities());
-            Manager.Utilities.Add(new InventoryUtilities());
-            Manager.Utilities.Add(new FlightUtilities());
+            Manager.InfoUtilities.Add(new GasUtilities());
+            Manager.InfoUtilities.Add(new InventoryUtilities());
+            Manager.InfoUtilities.Add(new FlightUtilities());
             Manager.Init();
         }
         public void Main(string argument, UpdateType updateSource)

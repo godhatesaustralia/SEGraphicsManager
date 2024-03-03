@@ -30,13 +30,13 @@ using VRageRender;
 
 namespace IngameScript
 {
-    public static class SharedUtilities
+    public static class Utilities
     {
         static public SpriteType defaultType = SpriteType.TEXT;
-        static public UpdateFrequency defaultUpdate = UpdateFrequency.None;
+        static public UpdateFrequency Update = UpdateFrequency.None;
         static public Color defaultColor = Color.HotPink;
 
-        public static UpdateFrequency UpdateConverter(UpdateType source)
+        public static UpdateFrequency Converter(UpdateType source)
         {
             var updateFrequency = UpdateFrequency.None; //0000
             if ((source & UpdateType.Update1) != 0) updateFrequency |= UpdateFrequency.Update1; //0001
@@ -47,34 +47,34 @@ namespace IngameScript
 
         public static void CreateBarGraph(ref SpriteData data)
         {
-            bool horizontal = data.SpriteSizeX > data.SpriteSizeY;
-            InfoUtility.GraphStorage.Add(data.UniqueID, new MyTuple<bool, float>(horizontal, horizontal ? data.SpriteSizeX : data.SpriteSizeY));
+            bool horizontal = data.SizeX > data.SizeY;
+            InfoUtility.GraphStorage.Add(data.uID, new MyTuple<bool, float>(horizontal, horizontal ? data.SizeX : data.SizeY));
         }
         public static void UpdateBarGraph(ref SpriteData data, double pctData) // will not work with square. L
         { 
-            var graph = InfoUtility.GraphStorage[data.UniqueID];
-            if (graph.Item1) data.SpriteSizeX = Convert.ToSingle(pctData) * graph.Item2;
-            else data.SpriteSizeY = Convert.ToSingle(pctData) * graph.Item2;
+            var graph = InfoUtility.GraphStorage[data.uID];
+            if (graph.Item1) data.SizeX = Convert.ToSingle(pctData) * graph.Item2;
+            else data.SizeY = Convert.ToSingle(pctData) * graph.Item2;
         }
 
         public static string EncodeSprites(ref LinkedDisplay display)
         // the idea: have this make the requisite SpriteData constructors here bc im too lazy
         // the constructor in question:
-        //  public SpriteData(SpriteType type, string name, string data, float sizeX, float sizeY, TextAlignment alignment,
+        //  public SpriteData(SpriteType type, string Name, string data, float sizeX, float sizeY, TextAlignment alignment,
         //  float posX, float posY, float ros, Color color, string fontid = "White", UpdateFrequency updateType = UpdateFrequency.None,
         //  string command = "", bool builder = false, string prepend = "") (jesus christ)
         {
             var encodedOutput = "";
             var comma = ", ";
-            foreach (var surface in display.DisplayOutputs)
+            foreach (var surface in display.Outputs)
             {
                 encodedOutput += $"// screen {surface.Key.Name} background color {surface.Key.BackgroundColor}\n";
                 foreach (var sprite in surface.Value.Values)
                 {
-                    encodedOutput += $"new SpriteData({sprite.spriteType}, {sprite.Name}, {sprite.Data}, {(sprite.spriteType != SpriteType.TEXT ? sprite.SpriteSizeX + comma + sprite.SpriteSizeY + comma : "")}" +
-                        $"TextAlignment.{sprite.SpriteAlignment.ToString().ToUpper()}, {sprite.SpritePosX}, {sprite.SpritePosY}, " +
-                        $"{sprite.SpriteRorS}, new Color({sprite.SpriteColor.R}, {sprite.SpriteColor.G}, {sprite.SpriteColor.B}, {sprite.SpriteColor.A}){(sprite.spriteType != SpriteType.TEXT ? "" : comma + sprite.FontID)}" +
-                        $"{(sprite.CommandFrequency != UpdateFrequency.None ? comma + sprite.CommandFrequency.ToString() + comma + sprite.CommandString + comma + sprite.UseStringBuilder + (sprite.UseStringBuilder ? comma + sprite.BuilderPrepend + comma + sprite.BuilderAppend : "") : "")});\n";
+                    encodedOutput += $"new SpriteData({sprite.Type}, {sprite.Name}, {sprite.Data}, {(sprite.Type != SpriteType.TEXT ? sprite.SizeX + comma + sprite.SizeY + comma : "")}" +
+                        $"TextAlignment.{sprite.Alignment.ToString().ToUpper()}, {sprite.PosX}, {sprite.PosY}, " +
+                        $"{sprite.RorS}, new Color({sprite.Color.R}, {sprite.Color.G}, {sprite.Color.B}, {sprite.Color.A}){(sprite.Type != SpriteType.TEXT ? "" : comma + sprite.FontID)}" +
+                        $"{(sprite.CommandFrequency != UpdateFrequency.None ? comma + sprite.CommandFrequency.ToString() + comma + sprite.CommandString + comma + sprite.Builder + (sprite.Builder ? comma + sprite.Prepend + comma + sprite.Append : "") : "")});\n";
                 }
             }
             return encodedOutput;
@@ -82,9 +82,10 @@ namespace IngameScript
 
     }
 
-    public class DisplayIniKeys //avoid allocating new memory for every display (i hope). just seems less retarded.
+    public class IniKeys //avoid allocating new memory for every display (i hope). just seems less retarded.
     {
         public string
+            KeyTag,
             ScreenSection,
             SpriteSection,
             ListKey,
@@ -93,12 +94,12 @@ namespace IngameScript
             SizeKey,
             AlignKey,
             PositionKey,
-            RotationScaleKey,
+            RotationKey,
+            ScaleKey,
             ColorKey,
             FontKey,
             CommandKey,
             UpdateKey,
-            BuilderKey,
             PrependKey,
             AppendKey;
         public char
@@ -110,20 +111,20 @@ namespace IngameScript
         {
             ScreenSection = "SECT_SCREEN";
             SpriteSection = "SECT_SPRITE";
-            ListKey = "K_LIST";
-            TypeKey = "K_TYPE";
-            DataKey = "K_DATA";
-            SizeKey = "K_SIZE";
-            AlignKey = "K_ALIGN";
-            PositionKey = "K_COORD";
-            RotationScaleKey = "K_ROTSCAL";
-            ColorKey = "K_COLOR";
-            FontKey = "K_FONT";
-            CommandKey = "K_CMD";
-            UpdateKey = "K_UPDT";
-            BuilderKey = "K_BUILD";
-            PrependKey = "K_PREP";
-            AppendKey = "K_APP";
+            ListKey = "LIST";
+            TypeKey = "TYPE";
+            DataKey = "DATA";
+            SizeKey = "SIZE";
+            AlignKey = "ALIGN";
+            PositionKey = "POS";
+            RotationKey = "ROTATION";
+            ScaleKey = "SCALE";
+            ColorKey = "COLOR";
+            FontKey = "FONT";
+            CommandKey = "CMD";
+            UpdateKey = "UPDT";
+            PrependKey = "PREP";
+            AppendKey = "APP";
         }
 
 

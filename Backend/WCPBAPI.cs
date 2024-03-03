@@ -22,9 +22,6 @@ namespace IngameScript
 {
     public class WCPBAPI
     {
-        private Action<ICollection<MyDefinitionId>> _getCoreWeapons;
-        private Action<ICollection<MyDefinitionId>> _getCoreStaticLaunchers;
-        private Action<ICollection<MyDefinitionId>> _getCoreTurrets;
         private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, IDictionary<string, int>, bool> _getBlockWeaponMap;
         private Action<Sandbox.ModAPI.Ingame.IMyTerminalBlock, IDictionary<MyDetectedEntityInfo, float>> _getSortedThreats;
         private Action<Sandbox.ModAPI.Ingame.IMyTerminalBlock, ICollection<Sandbox.ModAPI.Ingame.MyDetectedEntityInfo>> _getObstructions;
@@ -37,16 +34,16 @@ namespace IngameScript
         private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, float> _getHeatLevel;
         private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, float> _currentPowerConsumption;
         private Func<MyDefinitionId, float> _getMaxPower;
-        private Func<long, bool> _hasGridAi;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, bool> _hasCoreWeapon;
-        private Func<long, float> _getOptimalDps;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, string> _getActiveAmmo;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, long> _getPlayerController;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, Matrix> _getWeaponAzimuthMatrix;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, Matrix> _getWeaponElevationMatrix;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, long, bool, bool, bool> _isTargetValid;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, MyTuple<Vector3D, Vector3D>> _getWeaponScope;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, MyTuple<bool, bool>> _isInRange;
+        //private Func<long, bool> _hasGridAi;
+        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, bool> _hasCoreWeapon;
+        //private Func<long, float> _getOptimalDps;
+        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, string> _getActiveAmmo;
+        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, long> _getPlayerController;
+        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, Matrix> _getWeaponAzimuthMatrix;
+        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, Matrix> _getWeaponElevationMatrix;
+        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, long, bool, bool, bool> _isTargetValid;
+        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, MyTuple<Vector3D, Vector3D>> _getWeaponScope;
+        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, MyTuple<bool, bool>> _isInRange;
         static public void Activate(IMyTerminalBlock pbBlock, ref WCPBAPI apiHandle)
         {
             if (apiHandle != null)
@@ -65,9 +62,6 @@ namespace IngameScript
             if (delegates == null)
                 return false;
 
-            AssignMethod(delegates, "GetCoreWeapons", ref _getCoreWeapons);
-            AssignMethod(delegates, "GetCoreStaticLaunchers", ref _getCoreStaticLaunchers);
-            AssignMethod(delegates, "GetCoreTurrets", ref _getCoreTurrets);
             AssignMethod(delegates, "GetBlockWeaponMap", ref _getBlockWeaponMap);
             AssignMethod(delegates, "GetSortedThreats", ref _getSortedThreats);
             AssignMethod(delegates, "GetObstructions", ref _getObstructions);
@@ -80,15 +74,15 @@ namespace IngameScript
             AssignMethod(delegates, "GetHeatLevel", ref _getHeatLevel);
             AssignMethod(delegates, "GetCurrentPower", ref _currentPowerConsumption);
             AssignMethod(delegates, "GetMaxPower", ref _getMaxPower);
-            AssignMethod(delegates, "HasGridAi", ref _hasGridAi);
-            AssignMethod(delegates, "HasCoreWeapon", ref _hasCoreWeapon);
-            AssignMethod(delegates, "GetActiveAmmo", ref _getActiveAmmo);
-            AssignMethod(delegates, "GetPlayerController", ref _getPlayerController);
-            AssignMethod(delegates, "GetWeaponAzimuthMatrix", ref _getWeaponAzimuthMatrix);
-            AssignMethod(delegates, "GetWeaponElevationMatrix", ref _getWeaponElevationMatrix);
-            AssignMethod(delegates, "IsTargetValid", ref _isTargetValid);
-            AssignMethod(delegates, "GetWeaponScope", ref _getWeaponScope);
-            AssignMethod(delegates, "IsInRange", ref _isInRange);
+            //AssignMethod(delegates, "HasGridAi", ref _hasGridAi);
+            //AssignMethod(delegates, "HasCoreWeapon", ref _hasCoreWeapon);
+            //AssignMethod(delegates, "GetActiveAmmo", ref _getActiveAmmo);
+            //AssignMethod(delegates, "GetPlayerController", ref _getPlayerController);
+            //AssignMethod(delegates, "GetWeaponAzimuthMatrix", ref _getWeaponAzimuthMatrix);
+            //AssignMethod(delegates, "GetWeaponElevationMatrix", ref _getWeaponElevationMatrix);
+            //AssignMethod(delegates, "IsTargetValid", ref _isTargetValid);
+            //AssignMethod(delegates, "GetWeaponScope", ref _getWeaponScope);
+            //AssignMethod(delegates, "IsInRange", ref _isInRange);
             return true;
         }
 
@@ -109,13 +103,6 @@ namespace IngameScript
                 throw new Exception(
                     $"{GetType().Name} :: Delegate {name} is not type {typeof(T)}, instead it's: {del.GetType()}");
         }
-
-        public void GetAllCoreWeapons(ICollection<MyDefinitionId> collection) => _getCoreWeapons?.Invoke(collection);
-
-        public void GetAllCoreStaticLaunchers(ICollection<MyDefinitionId> collection) =>
-            _getCoreStaticLaunchers?.Invoke(collection);
-
-        public void GetAllCoreTurrets(ICollection<MyDefinitionId> collection) => _getCoreTurrets?.Invoke(collection);
 
         public bool GetBlockWeaponMap(IMyTerminalBlock weaponBlock, IDictionary<string, int> collection) =>
             _getBlockWeaponMap?.Invoke(weaponBlock, collection) ?? false;
@@ -145,28 +132,28 @@ namespace IngameScript
         public float GetHeatLevel(IMyTerminalBlock weapon) => _getHeatLevel?.Invoke(weapon) ?? 0f;
         public float GetCurrentPower(IMyTerminalBlock weapon) => _currentPowerConsumption?.Invoke(weapon) ?? 0f;
         public float GetMaxPower(MyDefinitionId weaponDef) => _getMaxPower?.Invoke(weaponDef) ?? 0f;
-        public bool HasGridAi(long entity) => _hasGridAi?.Invoke(entity) ?? false;
-        public bool HasCoreWeapon(IMyTerminalBlock weapon) => _hasCoreWeapon?.Invoke(weapon) ?? false;
-        public float GetOptimalDps(long entity) => _getOptimalDps?.Invoke(entity) ?? 0f;
+        //public bool HasGridAi(long entity) => _hasGridAi?.Invoke(entity) ?? false;
+        //public bool HasCoreWeapon(IMyTerminalBlock weapon) => _hasCoreWeapon?.Invoke(weapon) ?? false;
+        //public float GetOptimalDps(long entity) => _getOptimalDps?.Invoke(entity) ?? 0f;
 
-        public string GetActiveAmmo(IMyTerminalBlock weapon, int weaponId) =>
-            _getActiveAmmo?.Invoke(weapon, weaponId) ?? null;
+        //public string GetActiveAmmo(IMyTerminalBlock weapon, int weaponId) =>
+        //    _getActiveAmmo?.Invoke(weapon, weaponId) ?? null;
 
-        public long GetPlayerController(IMyTerminalBlock weapon) => _getPlayerController?.Invoke(weapon) ?? -1;
+        //public long GetPlayerController(IMyTerminalBlock weapon) => _getPlayerController?.Invoke(weapon) ?? -1;
 
-        public Matrix GetWeaponAzimuthMatrix(IMyTerminalBlock weapon, int weaponId) =>
-            _getWeaponAzimuthMatrix?.Invoke(weapon, weaponId) ?? Matrix.Zero;
+        //public Matrix GetWeaponAzimuthMatrix(IMyTerminalBlock weapon, int weaponId) =>
+        //    _getWeaponAzimuthMatrix?.Invoke(weapon, weaponId) ?? Matrix.Zero;
 
-        public Matrix GetWeaponElevationMatrix(IMyTerminalBlock weapon, int weaponId) =>
-            _getWeaponElevationMatrix?.Invoke(weapon, weaponId) ?? Matrix.Zero;
+        //public Matrix GetWeaponElevationMatrix(IMyTerminalBlock weapon, int weaponId) =>
+        //    _getWeaponElevationMatrix?.Invoke(weapon, weaponId) ?? Matrix.Zero;
 
-        public bool IsTargetValid(IMyTerminalBlock weapon, long targetId, bool onlyThreats, bool checkRelations) =>
-            _isTargetValid?.Invoke(weapon, targetId, onlyThreats, checkRelations) ?? false;
+        //public bool IsTargetValid(IMyTerminalBlock weapon, long targetId, bool onlyThreats, bool checkRelations) =>
+        //    _isTargetValid?.Invoke(weapon, targetId, onlyThreats, checkRelations) ?? false;
 
-        public MyTuple<Vector3D, Vector3D> GetWeaponScope(IMyTerminalBlock weapon, int weaponId) =>
-            _getWeaponScope?.Invoke(weapon, weaponId) ?? new MyTuple<Vector3D, Vector3D>();
-        // terminalBlock, Threat, Other, Something 
-        public MyTuple<bool, bool> IsInRange(IMyTerminalBlock block) =>
-            _isInRange?.Invoke(block) ?? new MyTuple<bool, bool>();
+        //public MyTuple<Vector3D, Vector3D> GetWeaponScope(IMyTerminalBlock weapon, int weaponId) =>
+        //    _getWeaponScope?.Invoke(weapon, weaponId) ?? new MyTuple<Vector3D, Vector3D>();
+        //// terminalBlock, Threat, Other, Something 
+        //public MyTuple<bool, bool> IsInRange(IMyTerminalBlock block) =>
+        //    _isInRange?.Invoke(block) ?? new MyTuple<bool, bool>();
     }
 }

@@ -32,52 +32,54 @@ namespace IngameScript
         public bool useCustomDisplays;
 
         public MyGridProgram Program;
-        public IMyGridTerminalSystem TerminalSystem;
+        public IMyGridTerminalSystem Terminal;
         public IMyProgrammableBlock Me;
 
         public long
         Frame,
         RuntimeMSRounded;
         public double RuntimeMS;
-        public string tag, name;
+        public string Tag, GCM, Name;
 
         public Dictionary<string, Action<SpriteData>> Commands;
         public HashSet<DisplayBase> Displays;
-        public HashSet<InfoUtility> Utilities; //hash set for now
-        public List<IMyTerminalBlock> AllBlocks;
+        public HashSet<InfoUtility> InfoUtilities; //hash set for now
+        public List<IMyTerminalBlock> Blocks;
             
-        public DisplayIniKeys Keys;
+        public IniKeys Keys;
         internal StringBuilder Builder;
 
         bool frozen = false;
         #endregion
 
-        public GraphicsManager(MyGridProgram program)
+        public GraphicsManager(MyGridProgram program, string t)
         {
             Program = program;
-            TerminalSystem = program.GridTerminalSystem;
+            GCM = t;
+            Terminal = program.GridTerminalSystem;
             Me = program.Me;
             Commands = new Dictionary<string, Action<SpriteData>>();
             Displays = new HashSet<DisplayBase>();
-            Utilities = new HashSet<InfoUtility>();
-            AllBlocks = new List<IMyTerminalBlock>();
+            InfoUtilities = new HashSet<InfoUtility>();
+            Blocks = new List<IMyTerminalBlock>();
             Builder = new StringBuilder();
             Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
             var p = new Parser();
             var result = new MyIniParseResult();
-            if (p.TryParseCustomData(Me, out result))
+            if (p.CustomData(Me, out result))
             {
-                tag = p.ParseString("GCM", "tag");
-                name = p.ParseString("GCM", "group name", "Screen Control");
-            }    
+                Tag = p.String(GCM, "tag", GCM);
+                Name = p.String(GCM, "group name", "Screen Control");
+            }
             else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
+            Commands.Add("!def", (b) =>{ return; });
         }
 
         public void Clear()
         {
             Commands.Clear();
             Displays.Clear();
-            AllBlocks.Clear();
+            Blocks.Clear();
         }
 
 
@@ -87,29 +89,34 @@ namespace IngameScript
             Frame = 0;
             RuntimeMSRounded = 0;
             RuntimeMS = 0;
-            TerminalSystem.GetBlocksOfType(AllBlocks);
+            Terminal.GetBlocksOfType(Blocks);
 
-            foreach (InfoUtility utility in Utilities)
+            foreach (InfoUtility utility in InfoUtilities)
                 utility.Reset(Program);
-            foreach (InfoUtility utility in Utilities)
+            foreach (InfoUtility utility in InfoUtilities)
                 utility.RegisterCommands(ref Commands);
 
            if (useCustomDisplays)
             {
+                
                 Keys.ResetKeys(); // lol. lmao
                 List<IMyTerminalBlock> blocks = new List<IMyTerminalBlock>();
-                TerminalSystem.GetBlockGroupWithName(tag + " " + name).GetBlocks(blocks);
+                var g = Terminal.GetBlockGroupWithName(Tag + " " + Name);
+                if (g == null) throw new Exception($"Block group not found. Script is looking for \"{Tag} {Name}\".");
+                g.GetBlocks(blocks);
                 foreach (var block in blocks)
                 {
-                    var display = new LinkedDisplay(block, ref Commands, ref Program, ref Keys);
-                    Displays.Add(display);
-                    display.Setup(block);
-                    foreach (var surface in display.DisplayOutputs)
+                    Program.Echo(block.CustomName);
+                    var dsp = new LinkedDisplay(block, ref Commands, ref Program, ref Keys);
+                    Displays.Add(dsp);
+                    dsp.Setup(block);
+                    Program.Echo($"Parsing {block.CustomName}:");
+                    foreach (var surface in dsp.Outputs)
                     {
                         Program.Echo($"SURFACE {surface.Key.DisplayName} LOADED\n");
-                        Program.Echo($"SURFACE UPDATE {display.DisplayRefreshFreqencies[surface.Key]}");
+                        Program.Echo($"SURFACE UPDATE {dsp.RefreshFreqencies[surface.Key]}");
                     }
-                    //block.CustomData = SharedUtilities.EncodeSprites(ref display);
+                    //block.CustomData = InfoUtilities.EncodeSprites(ref dsp);
                 }
             }
 
@@ -128,6 +135,7 @@ namespace IngameScript
             UpdateTimes();
             if (arg != "")
             {
+                arg = arg.ToLower();
                 switch (arg)
                 {
                     case "reset":
@@ -145,7 +153,7 @@ namespace IngameScript
                             }
                             else
                             {
-                                Program.Runtime.UpdateFrequency = SharedUtilities.defaultUpdate;
+                                Program.Runtime.UpdateFrequency = Utilities.Update;
                                 frozen = true;
                                 break;
                             }
@@ -154,22 +162,21 @@ namespace IngameScript
                     default: { break; }
                 }
             }
-            var sourceflags = SharedUtilities.UpdateConverter(source);
-            var targetflags = (UpdateFrequency)1;
+            var sflags = Utilities.Converter(source);
+            var tflags = (UpdateFrequency)1;
             //intel subsystem(maybe?): DO SOMETHING!!!!
-            foreach (LinkedDisplay display in Displays)
+            foreach (LinkedDisplay dsp in Displays)
             {
-                if ((display.UpdateFrequency & sourceflags) != 0)
-                    display.Update(ref source);
-                targetflags |= display.UpdateFrequency;
+                if ((dsp.UpdateFrequency & sflags) != 0)
+                    dsp.Update(ref source);
+                tflags |= dsp.UpdateFrequency;
             }
-            Program.Runtime.UpdateFrequency = targetflags;
+            Program.Runtime.UpdateFrequency = tflags;
                 
            if (Frame > 1000)
             {
-                Program.Echo($"cycle: {Frame}");
-                Program.Echo($"source: {source}");
-                Program.Echo($"runtime: {Program.Runtime.LastRunTimeMs} ms");
+                string r = $"RUNS - {Frame}\nSRC - {source}\nRUNTIME - {Program.Runtime.LastRunTimeMs} ms";
+                Program.Echo(r);
             }
         }
     }

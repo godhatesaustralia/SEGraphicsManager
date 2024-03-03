@@ -363,3 +363,4 @@ MigrationBackup/
 FodyWeavers.xsd
 GraphicsManager/MDK/MDK.options.props
 GraphicsManager/MDK/MDK.paths.props
+*.props

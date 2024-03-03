@@ -23,21 +23,22 @@ namespace IngameScript
     partial class Program : MyGridProgram
     {
         public GraphicsManager Manager;
+        string tag = "GCM";
         public Program()
         {
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
-            Manager = new GraphicsManager(this);
+            Manager = new GraphicsManager(this, tag);
 
             Manager.useCustomDisplays = true;
-            Manager.Keys = new DisplayIniKeys();
+            Manager.Keys = new IniKeys();
 
             
-            InventoryUtilities inv = new InventoryUtilities(this, "GCM");
-            Manager.Utilities.Add(inv);
-            Manager.Utilities.Add(new FlightUtilities());
-            Manager.Utilities.Add(new GasUtilities(inv));
-            Manager.Utilities.Add(new PowerUtilities(inv));
-            Manager.Utilities.Add(new WeaponUtilities(Manager.tag));
+            InventoryUtilities inv = new InventoryUtilities(this, tag);
+            Manager.InfoUtilities.Add(inv);
+            Manager.InfoUtilities.Add(new FlightUtilities());
+            Manager.InfoUtilities.Add(new GasUtilities(inv));
+            Manager.InfoUtilities.Add(new PowerUtilities(inv));
+            Manager.InfoUtilities.Add(new WeaponUtilities(Manager.Tag));
             Manager.Init();
         }
 

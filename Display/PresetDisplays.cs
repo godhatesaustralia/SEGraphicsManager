@@ -31,10 +31,10 @@ namespace IngameScript
         {
             Commands = commandsDict;
             CommandUsers = new Dictionary<IMyTextSurface, HashSet<string>>();
-            DisplayRefreshFreqencies = new Dictionary<IMyTextSurface, UpdateFrequency>();
-            DisplayOutputs = new Dictionary<IMyTextSurface, Dictionary<string, SpriteData>>();
-            DisplayName = block.CustomName;
-            DisplayID = block.EntityId;
+            RefreshFreqencies = new Dictionary<IMyTextSurface, UpdateFrequency>();
+            Outputs = new Dictionary<IMyTextSurface, Dictionary<string, SpriteData>>();
+            Name = block.CustomName;
+            dEID = block.EntityId;
             Program = program;
             // after this we manually fill out shit in display refresh freq, display outputs in program constructor. yeah it sucks but whatever u know
         }
