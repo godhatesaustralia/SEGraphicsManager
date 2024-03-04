@@ -16,7 +16,8 @@ namespace IngameScript
         static List<MyIni> IniParsers = new List<MyIni>();
         static int IniCount = 0;
         MyIni myIni;
-        public MyIniParseResult result;
+        string tld = "~";
+        MyIniParseResult result;
 
         public Parser()
         {
@@ -66,12 +67,12 @@ namespace IngameScript
         {
             aKy = keymod(aSct, aKy);
             var t = myIni.Get(aSct, aKy);
-            string c = "~";
+            string c = tld;
             if (t.ToByte(3) != 3)
                 return (SpriteType)t.ToByte(2);
             else
                 c = t.ToString(c).ToLower();
-            switch (c) // oh what the hell
+            switch (c) // *sigh*
             {
                 case "shape":
                 case "sprite":
@@ -88,7 +89,7 @@ namespace IngameScript
         {
             aKy = keymod(aSct, aKy);
             var a = myIni.Get(aSct, aKy);
-            string c = "~";
+            string c = tld;
             if (a.ToByte(3) != 3)
                 return (TextAlignment)a.ToByte(2);
             else
@@ -129,7 +130,7 @@ namespace IngameScript
             byte r, g, b, a;
             def = myIni.Get(aSct, aKy).ToString(def).ToLower();
             if (def.Length != 8) 
-                return Utilities.defaultColor; //safety
+                return Utilities.dColor; //safety
             r = Hex(def, 0, 2);
             g = Hex(def, 2, 2);
             b = Hex(def, 4, 2);

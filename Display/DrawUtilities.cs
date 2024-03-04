@@ -32,9 +32,14 @@ namespace IngameScript
 {
     public static class Utilities
     {
-        static public SpriteType defaultType = SpriteType.TEXT;
-        static public UpdateFrequency Update = UpdateFrequency.None;
-        static public Color defaultColor = Color.HotPink;
+        static public int increment = 9;
+        static public SpriteType dType = SpriteType.TEXT;
+        static public UpdateFrequency
+            uDef = UpdateFrequency.None,
+            u10 = UpdateFrequency.Update10,
+            u100 = UpdateFrequency.Update100;
+        static public Color dColor = Color.HotPink;
+
 
         public static UpdateFrequency Converter(UpdateType source)
         {
@@ -44,13 +49,21 @@ namespace IngameScript
             if ((source & UpdateType.Update100) != 0) updateFrequency |= UpdateFrequency.Update100;//0100
             return updateFrequency;
         }
-
-        public static void CreateBarGraph(ref SpriteData data)
+        public static UpdateType LConverter(UpdateFrequency f)
         {
-            bool horizontal = data.SizeX > data.SizeY;
-            InfoUtility.GraphStorage.Add(data.uID, new MyTuple<bool, float>(horizontal, horizontal ? data.SizeX : data.SizeY));
+            var u = UpdateType.None; //0000
+            if ((f & UpdateFrequency.Update1) != 0) u |= UpdateType.Update1; //0001
+            if ((f & u10) != 0) u |= UpdateType.Update10; //0010
+            if ((f & u100) != 0) u |= UpdateType.Update100;//0100
+            return u;
         }
-        public static void UpdateBarGraph(ref SpriteData data, double pctData) // will not work with square. L
+
+        public static void CreateBarGraph(ref SpriteData d)
+        {
+            bool horizontal = d.SizeX > d.SizeY || d.SizeX == d.SizeY;
+            InfoUtility.GraphStorage.Add(d.uID, new MyTuple<bool, float>(horizontal, horizontal ? d.SizeX : d.SizeY));
+        }
+        public static void UpdateBarGraph(ref SpriteData data, double pctData)
         { 
             var graph = InfoUtility.GraphStorage[data.uID];
             if (graph.Item1) data.SizeX = Convert.ToSingle(pctData) * graph.Item2;
@@ -60,8 +73,8 @@ namespace IngameScript
         public static string EncodeSprites(ref LinkedDisplay display)
         // the idea: have this make the requisite SpriteData constructors here bc im too lazy
         // the constructor in question:
-        //  public SpriteData(SpriteType type, string Name, string data, float sizeX, float sizeY, TextAlignment alignment,
-        //  float posX, float posY, float ros, Color color, string fontid = "White", UpdateFrequency updateType = UpdateFrequency.None,
+        //  public SpriteData(SpriteType type, string Name, string d, float sizeX, float sizeY, TextAlignment alignment,
+        //  float posX, float posY, float ros, dColor color, string fontid = "White", UpdateFrequency updateType = UpdateFrequency.None,
         //  string command = "", bool builder = false, string prepend = "") (jesus christ)
         {
             var encodedOutput = "";
@@ -82,26 +95,26 @@ namespace IngameScript
 
     }
 
-    public class IniKeys //avoid allocating new memory for every display (i hope). just seems less retarded.
+    public class IniKeys //avoid allocating new memory for every display (i hope). just seems less dumb.
     {
         public string
             KeyTag,
             ScreenSection,
             SpriteSection,
-            ListKey,
-            TypeKey,
-            DataKey,
-            SizeKey,
-            AlignKey,
-            PositionKey,
-            RotationKey,
-            ScaleKey,
-            ColorKey,
-            FontKey,
-            CommandKey,
-            UpdateKey,
-            PrependKey,
-            AppendKey;
+            List,
+            Type,
+            Data,
+            Size,
+            Align,
+            Pos,
+            Rotation,
+            Scale,
+            Color,
+            Font,
+            Command,
+            Update,
+            Prepend,
+            Append;
         public char
             l_coord = '(',
             r_coord = ')',
@@ -111,20 +124,20 @@ namespace IngameScript
         {
             ScreenSection = "SECT_SCREEN";
             SpriteSection = "SECT_SPRITE";
-            ListKey = "LIST";
-            TypeKey = "TYPE";
-            DataKey = "DATA";
-            SizeKey = "SIZE";
-            AlignKey = "ALIGN";
-            PositionKey = "POS";
-            RotationKey = "ROTATION";
-            ScaleKey = "SCALE";
-            ColorKey = "COLOR";
-            FontKey = "FONT";
-            CommandKey = "CMD";
-            UpdateKey = "UPDT";
-            PrependKey = "PREP";
-            AppendKey = "APP";
+            List = "LIST";
+            Type = "TYPE";
+            Data = "DATA";
+            Size = "SIZE";
+            Align = "ALIGN";
+            Pos = "POS";
+            Rotation = "ROTATION";
+            Scale = "SCALE";
+            Color = "COLOR";
+            Font = "FONT";
+            Command = "CMD";
+            Update = "UPDT";
+            Prepend = "PREP";
+            Append = "APP";
         }
 
 

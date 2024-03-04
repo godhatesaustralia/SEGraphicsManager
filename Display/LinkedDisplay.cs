@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Security.Policy;
 using System.Text;
 using VRage;
@@ -52,7 +53,7 @@ namespace IngameScript
                 frame.Add(data.sprCached);
                 return;
             }
-            //Program.Me.CustomData += $"\n{s.Type}, \n{s.Data}, \n{s.Size}, \n{s.Position}, \n{s.Color}, \n{s.Alignment}\n";
+            //Program.Me.CustomData += $"\n{s.dType}, \n{s.Data}, \n{s.Size}, \n{s.Position}, \n{s.dColor}, \n{s.Alignment}\n";
             frame.Add(SpriteData.createSprite(data));
         }
 
@@ -106,23 +107,23 @@ namespace IngameScript
         // and so on
 
         #endregion
-        bool TryAddSprites(ref IMyTextSurface thisSurface, ref Parser myParser, ref byte index, out UpdateFrequency screenFrequency)
+        bool TryAddSprites(ref IMyTextSurface surf, ref Parser myParser, ref byte index, out UpdateFrequency freq)
         {
             string sect;
-            screenFrequency = Utilities.Update;
+            freq = Utilities.uDef;
             var good = true;
             if (!isSingleScreen)
                 sect = $"{Keys.ScreenSection}_{index}";
             else
                 sect = Keys.ScreenSection;
             Program.Echo(sect);
-            CommandUsers.Add(thisSurface, new HashSet<string>());
+            CommandUsers.Add(surf, new HashSet<string>());
             if (myParser.hasSection(sect))
             {
-                thisSurface.ContentType = ContentType.SCRIPT;
-                thisSurface.Script = "";
-                thisSurface.ScriptBackgroundColor = myParser.Color(sect, Keys.ColorKey + "_BG");
-                var names = myParser.String(sect, Keys.ListKey);
+                surf.ContentType = ContentType.SCRIPT;
+                surf.Script = "";
+                surf.ScriptBackgroundColor = myParser.Color(sect, Keys.Color + "_BG");
+                var names = myParser.String(sect, Keys.List);
                 var nArray = names.Split(Keys.new_line);
                 for (int i = 0; i < nArray.Length; ++i)
                 { nArray[i] = nArray[i].Trim(Keys.new_entry); nArray[i] = nArray[i].Trim(); Program.Echo(nArray[i]); }
@@ -130,7 +131,7 @@ namespace IngameScript
                 if (nArray.Count() > 0)
                     foreach (var name in nArray)
                     {
-                        
+
                         var nametag = $"{Keys.SpriteSection}_{name}";
 
                         if (myParser.hasSection(nametag) && nArray.Contains(name))
@@ -139,91 +140,94 @@ namespace IngameScript
                             SpriteData s = new SpriteData();
                             //Name
                             s.Name = name;
-                            //Program.Me.CustomData += s.Name + new_line;
                             // >TYPE
-                            s.Type = myParser.Type(nametag, Keys.TypeKey);
-                            //Program.Me.CustomData += s.Type.ToString() + new_line;
+                            s.Type = myParser.Type(nametag, Keys.Type);
                             // >DATA
-                            if (myParser.hasKey(nametag, Keys.DataKey))
-                                s.Data = myParser.String(nametag, Keys.DataKey, "FAILED");
+                            if (myParser.hasKey(nametag, Keys.Data))
+                                s.Data = myParser.String(nametag, Keys.Data, "FAILED");
                             else s.Data = "";
-                            //Program.Me.CustomData += s.Data + new_line;
                             // >SIZE
-                            CartesianReader(ref s, ref myParser, Keys.SizeKey, nametag);
-                            //Program.Me.CustomData += $"[{s.SizeX}, {s.SizeY}]" + new_line;
+                            CartesianReader(ref s, ref myParser, Keys.Size, nametag);
                             // >ALIGN
-                            s.Alignment = myParser.Alignment(nametag, Keys.AlignKey);
-                            //Program.Me.CustomData += s.Alignment.ToString() + new_line;
+                            s.Alignment = myParser.Alignment(nametag, Keys.Align);
                             // >POSITION
-                            CartesianReader(ref s, ref myParser, Keys.PositionKey, nametag);
-                            //Program.Me.CustomData += $"[{s.PosX}, {s.PosY}]" + new_line;
+                            CartesianReader(ref s, ref myParser, Keys.Pos, nametag);
                             //COLOR
-                            s.Color = myParser.Color(nametag, Keys.ColorKey);
+                            s.Color = myParser.Color(nametag, Keys.Color);
                             // >ROTATION/SCALE
-                            s.RorS = myParser.Float(nametag, (s.Type == Utilities.defaultType ? Keys.ScaleKey : Keys.RotationKey), float.NaN);
+                            s.RorS = myParser.Float(nametag, (s.Type == Utilities.dType ? Keys.Scale : Keys.Rotation), float.NaN);
                             if (float.IsNaN(s.RorS))
-                                s.RorS = myParser.Float(nametag, (s.Type == Utilities.defaultType ? Keys.RotationKey : Keys.ScaleKey));
-                            //Program.Me.CustomData += $"[{s.RorS}]" + new_line;
+                                s.RorS = myParser.Float(nametag, (s.Type == Utilities.dType ? Keys.Rotation : Keys.Scale));
                             // >FONT
-                            if (myParser.hasKey(nametag, Keys.FontKey))
-                                s.FontID = s.Type == Utilities.defaultType ? myParser.String(nametag, Keys.FontKey, "Monospace") : "";
+                            if (myParser.hasKey(nametag, Keys.Font))
+                                s.FontID = s.Type == Utilities.dType ? myParser.String(nametag, Keys.Font, "Monospace") : "";
                             // >UPDATE
-                            if (myParser.hasKey(nametag, Keys.UpdateKey))
+                            if (myParser.hasKey(nametag, Keys.Update))
                             {
-                                var update = myParser.Byte(nametag, Keys.UpdateKey, 0);
+                                var update = myParser.Byte(nametag, Keys.Update, 0);
                                 s.CommandFrequency = (UpdateFrequency)update;
-                                screenFrequency |= s.CommandFrequency;
-                       
+                                freq |= s.CommandFrequency;
+
                             }
                             else
-                                s.CommandFrequency = Utilities.Update;
-                            
+                                s.CommandFrequency = Utilities.uDef;
+
                             // >COMMAND
-                            if (myParser.hasKey(nametag, Keys.CommandKey) && s.CommandFrequency != 0)
+                            if (myParser.hasKey(nametag, Keys.Command) && s.CommandFrequency != 0)
                             {
-                                if (s.CommandFrequency != Utilities.Update && s.CommandString != "")
+                                if (s.CommandFrequency != Utilities.uDef && s.CommandString != "")
                                 {
                                     // uID
                                     s.uID = dEID + index + Array.IndexOf(nArray, name);
                                     // >PREPEND
-                                    if (s.Builder && myParser.hasKey(nametag, Keys.PrependKey))
-                                        s.Prepend = myParser.String(nametag, Keys.PrependKey) + " ";
+                                    if (myParser.hasKey(nametag, Keys.Prepend))
+                                        s.Prepend = myParser.String(nametag, Keys.Prepend) + " ";
                                     // >APPEND
-                                    if (s.Builder && myParser.hasKey(nametag, Keys.AppendKey))
-                                        s.Append = " " + myParser.String(nametag, Keys.AppendKey);
+                                    if (myParser.hasKey(nametag, Keys.Append))
+                                        s.Append = " " + myParser.String(nametag, Keys.Append);
                                     // >USEBUILDER
                                     s.Builder = !s.Prepend.Equals("") || !s.Append.Equals("");
-                                    s.CommandString = s.CommandFrequency == Utilities.Update ? "" : myParser.String(nametag, Keys.CommandKey, "!def");
+                                    s.CommandString = s.CommandFrequency == Utilities.uDef ? "" : myParser.String(nametag, Keys.Command, "!def");
                                     if (!Commands.ContainsKey(s.CommandString))
                                         throw new Exception($"PARSE FAILURE: sprite {s.Name} on screen {Name} has invalid command {s.CommandString}");
-                                    CommandUsers[thisSurface].Add(s.Name);
+                                    CommandUsers[surf].Add(s.Name);
                                     s.Command = Commands[s.CommandString];
                                     s.Command.Invoke(s);
                                 }
                             }
                             s.sprCached = SpriteData.createSprite(s, true);
                             // We're done!
-                            if (!Outputs[thisSurface].ContainsKey(s.Name))
-                                Outputs[thisSurface].Add(s.Name, s);
+                            if (!Outputs[surf].ContainsKey(s.Name))
+                                Outputs[surf].Add(s.Name, s);
                         }
                         else
                             good = false;
                     }
-            }             
+            }
+            else scrDefault(surf);
+            Program.Echo($"surface {surf.DisplayName} LOADED, update at {freq}");
             return good;
+        }
+
+        void scrDefault(IMyTextSurface s)
+        {
+            s.ContentType = (ContentType)3;
+            s.Alignment = (TextAlignment)2;
+            var t = $"{Name}\nSURFACE {s.Name}\nSCREEN SIZE {s.SurfaceSize}\nTEXTURE SIZE {s.TextureSize}";
+            s.WriteText(t);
         }
 
         void CartesianReader(ref SpriteData sprite, ref Parser myParser, string key, string nametag)
         {
             var coords = myParser.String(nametag, key).Split(',');
 
-            if (key == Keys.PositionKey)
+            if (key == Keys.Pos)
             {
                 sprite.PosX = float.Parse(coords.First().Trim(Keys.l_coord));
                 sprite.PosY = float.Parse(coords.Last().Trim(Keys.r_coord));
             }
 
-            else if (key == Keys.SizeKey && sprite.Type != Utilities.defaultType)
+            else if (key == Keys.Size && sprite.Type != Utilities.dType)
             {
                 sprite.SizeX = float.Parse(coords.First().Trim(Keys.l_coord));
                 sprite.SizeY = float.Parse(coords.Last().Trim(Keys.r_coord));
@@ -233,80 +237,83 @@ namespace IngameScript
         public override void Setup(IMyTerminalBlock block)
         {
             Parser MyParser = new Parser();
-            byte index = 0;          
+            byte index = 0;
             MyIniParseResult Result;
-            var freq = Utilities.Update;
-                if (MyParser.CustomData(block, out Result))
+            var freq = Utilities.uDef;
+            if (MyParser.CustomData(block, out Result))
+            {
+                if (block is IMyTextSurface)
                 {
-                    if (block is IMyTextSurface)
-                    {
-                        var DisplayBlock = (IMyTextSurface)block;
-                        Outputs.Add(DisplayBlock, new Dictionary<string, SpriteData>());
+                    var DisplayBlock = (IMyTextSurface)block;
+                    Outputs.Add(DisplayBlock, new Dictionary<string, SpriteData>());
 
-                        isSingleScreen = true;
-                        if (TryAddSprites(ref DisplayBlock, ref MyParser, ref index, out freq))
+                    isSingleScreen = true;
+                    if (TryAddSprites(ref DisplayBlock, ref MyParser, ref index, out freq))
+                    {
+                        RefreshFreqencies.Add(DisplayBlock, freq);
+                    }
+                    else scrDefault(DisplayBlock);
+
+                }
+                else if (block is IMyTextSurfaceProvider)
+                {
+                    isSingleScreen = false;
+                    var DisplayBlock = (IMyTextSurfaceProvider)block;
+                    var SurfaceCount = DisplayBlock.SurfaceCount;
+
+                    for (index = 0; index < SurfaceCount; ++index)
+                    {
+                        var surface = DisplayBlock.GetSurface(index);
+                        if (!Outputs.ContainsKey(surface))
+                            Outputs.Add(surface, new Dictionary<string, SpriteData>());
+                        if (TryAddSprites(ref surface, ref MyParser, ref index, out freq))
+                            RefreshFreqencies.Add(surface, freq);
+                        else
                         {
-                            RefreshFreqencies.Add(DisplayBlock, freq);
-                        }
-
-                    }
-                    else if (block is IMyTextSurfaceProvider)
-                    {
-                        isSingleScreen = false;
-                        var DisplayBlock = (IMyTextSurfaceProvider)block;
-                        var SurfaceCount = DisplayBlock.SurfaceCount;
-
-                        for (index = 0; index < SurfaceCount; ++index)
-                        {
-                            var surface = DisplayBlock.GetSurface(index);
-                            if (!Outputs.ContainsKey(surface))
-                                Outputs.Add(surface, new Dictionary<string, SpriteData>());
-                            if (TryAddSprites(ref surface, ref MyParser, ref index, out freq)/* && RefreshFreqencies.hasKey(surface) WHAT TEH FUCK WHY DID I DO THIS*/)
-                                RefreshFreqencies.Add(surface, freq);
-                            else RefreshFreqencies.Add(surface, Utilities.Update);
+                            scrDefault(surface);
+                            RefreshFreqencies.Add(surface, Utilities.uDef);
                         }
                     }
                 }
-                else throw new Exception($" PARSE FAILURE: {Name} cd error {Result.Error} at {Result.LineNo}");
-                MyParser.Dispose();
+            }
+            else throw new Exception($" PARSE FAILURE: {Name} cd error {Result.Error} at {Result.LineNo}");
+            MyParser.Dispose();
 
-                foreach (var display in Outputs)
+            foreach (var display in Outputs)
+            {
+                var frame = display.Key.DrawFrame();
+                foreach (var sprite in display.Value)
                 {
-                    var frame = display.Key.DrawFrame();
-                    //                var piss = display.Key.TextureSize * 0.5f;
-                    foreach (var sprite in display.Value)
-                    {
-                        DrawNewSprite(ref frame, sprite.Value);
-                        //Program.Me.CustomData += s.Value.Name + new_line;
-                    }
-                    frame.Dispose();
+                    DrawNewSprite(ref frame, sprite.Value);
+                    //Program.Me.CustomData += s.Value.Name + new_line;
                 }
+                frame.Dispose();
+            }
 
-                foreach (var updateFrequency in RefreshFreqencies.Values)
-                {
-                    // Program.Echo($"{UpdateFrequency} |= {updateFrequency}");
-                    UpdateFrequency |= updateFrequency;
-                    // Program.Echo($"{UpdateFrequency}");
-                }
-            
+            foreach (var ufrq in RefreshFreqencies.Values)
+            {
+                // Program.Echo($"{UpdateFrequency} |= {ufrq}");
+                UpdateFrequency |= ufrq;
+                // Program.Echo($"{UpdateFrequency}");
+            }
+
         }
 
         public override void Update(ref UpdateType sourceFlags)
         {
             var sourceFreqFlags = Utilities.Converter(sourceFlags);
             foreach (var display in Outputs)
-                if ((RefreshFreqencies[display.Key] & sourceFreqFlags) != 0) //is display frequency the same as frequency of update source?
+                if ((RefreshFreqencies[display.Key] & sourceFreqFlags) != 0) //is display frequency the same as frequency of update cycleSrc?
                 {                                                                   // i.e. do we update display on this tick
                     //Program.Me.CustomData += $"UPDATED {display}, {Program.Runtime.TimeSinceLastRun}\n";
                     foreach (var name in display.Value.Keys)
-                        if (CommandUsers[display.Key].Contains(name) && (display.Value[name].CommandFrequency & sourceFreqFlags) != 0) //is command frequency the same as frequency of update source?
+                        if (CommandUsers[display.Key].Contains(name) && (display.Value[name].CommandFrequency & sourceFreqFlags) != 0) //is command frequency the same as frequency of update cycleSrc?
                         {
                             display.Value[name].Command.Invoke(display.Value[name]);
                             if (display.Value[name].Builder)
                                 InfoUtility.ApplyBuilder(display.Value[name]);
                         }//i.e. do we run command on this tick
                     var frame = display.Key.DrawFrame();
-                    var piss = display.Key.TextureSize * 0.5f;
                     foreach (var sprite in display.Value)
                         DrawNewSprite(ref frame, sprite.Value);
                     frame.Dispose();

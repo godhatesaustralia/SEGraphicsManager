@@ -15,7 +15,7 @@ namespace IngameScript
         public TextAlignment Alignment;
         public Action<SpriteData> Command;
         public UpdateFrequency CommandFrequency;
-        public long uID; // this field is only set if sprite is using a command.
+        public long uID = -1; // this field is only set if sprite is using a command.
         public float
             SizeX,
             SizeY,
@@ -42,8 +42,8 @@ namespace IngameScript
 
         public SpriteData()
         {
-            Type = Utilities.defaultType;
-            CommandFrequency = Utilities.Update;
+            Type = Utilities.dType;
+            CommandFrequency = Utilities.uDef;
             Command = null;
             uID = -1;
             Builder = false;
@@ -76,10 +76,10 @@ namespace IngameScript
                 return d.sprCached;
             else
             {
-                var sprite = d.Type == Utilities.defaultType ? new MySprite(
+                var sprite = d.Type == Utilities.dType ? new MySprite(
                 d.Type,
                 d.Data,
-                new Vector2(d.PosX, d.PosY), // + center,
+                new Vector2(d.PosX, d.PosY),
                 null,
                 d.Color,
                 d.FontID,
@@ -89,7 +89,7 @@ namespace IngameScript
                 : new MySprite(
                 d.Type,
                 d.Data,
-                new Vector2(d.PosX, d.PosY), // + center,
+                new Vector2(d.PosX, d.PosY),
                 new Vector2(d.SizeX, d.SizeY),
                 d.Color,
                 null,

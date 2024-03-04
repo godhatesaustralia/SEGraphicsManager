@@ -57,7 +57,6 @@ namespace IngameScript
                 return Program.Runtime.TimeSinceLastRun;
             }
         }
-
         #endregion
 
         public InfoUtility()
@@ -424,12 +423,12 @@ namespace IngameScript
 
         void AddItemGroup(long id, string key)
         {
-            Parser parser = new Parser();
+            Parser p = new Parser();
             MyIniParseResult result;
-            if (parser.CustomData(Reference, out result))
-                if (parser.hasKey(Section, key))
+            if (p.CustomData(Reference, out result))
+                if (p.hasKey(Section, key))
                 {
-                    var s = parser.String(Section, key).Split('\n');
+                    var s = p.String(Section, key).Split('\n');
                     if (s.Length > 0)
                     {
                         var array = new InventoryItem[s.Length];
@@ -754,6 +753,17 @@ namespace IngameScript
         Dictionary<long, MyTuple<string, IMyTerminalBlock[]>> WeaponGroups = new Dictionary<long, MyTuple<string, IMyTerminalBlock[]>>();
         WCPBAPI api = null;
         string tag;
+        int runs = 0, ok = 500;
+        bool hasWC = true; 
+        bool wait
+        {
+            get 
+            { 
+                WCPBAPI.Activate(Program.Me, ref api); 
+                runs++; 
+                return runs <= ok; 
+            }
+        }
 
         public WeaponUtilities(string t)
         {
@@ -767,18 +777,26 @@ namespace IngameScript
             WCPBAPI.Activate(Program.Me, ref api);
             WeaponGroups.Clear();
         }
-
+        bool noWC(ref SpriteData b)
+        {
+            var r = !hasWC || api == null;
+            if (r) b.Data = "ERROR";
+            return r;
+        }
         public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands)
         {
             commands.Add("!wpnrdy", (b) =>
             {
-                if (justStarted) AddWeaponGroup(b);
+                if (wait) return;
+                if (noWC(ref b)) { hasWC = false; return; }
+                if (runs >= ok && !WeaponGroups.ContainsKey(b.uID)) AddWeaponGroup(b);
                 else if (WeaponGroups.ContainsKey(b.uID))
                     UpdateWeaponCharge(ref b);
             });
             commands.Add("!tgt", (b) =>
             {
-                if (api == null) { b.Data = "ERROR"; return; }
+                if (wait) return;
+                if (noWC(ref b)) { hasWC = false; return; }
                 else
                 {
                     var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
@@ -788,7 +806,8 @@ namespace IngameScript
 
             commands.Add("!tgtdist", (b) =>
             {
-                if (api == null) { b.Data = "ERROR"; return; }
+                if (wait) return;
+                if (noWC(ref b)) { hasWC = false; return; }
                 else
                 {
                     var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
