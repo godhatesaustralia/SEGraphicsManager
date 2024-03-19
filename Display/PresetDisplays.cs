@@ -31,7 +31,7 @@ namespace IngameScript
         {
             Commands = commandsDict;
             CommandUsers = new Dictionary<IMyTextSurface, HashSet<string>>();
-            RefreshFreqencies = new Dictionary<IMyTextSurface, UpdateFrequency>();
+            Refresh = new Dictionary<IMyTextSurface, Priority>();
             Outputs = new Dictionary<IMyTextSurface, Dictionary<string, SpriteData>>();
             Name = block.CustomName;
             dEID = block.EntityId;
@@ -44,7 +44,7 @@ namespace IngameScript
             throw new Exception(" die");
         }
 
-        public override void Update(ref UpdateType sourceFlags)
+        public override void Update(ref Priority p)
         {
             throw new Exception(" die");
         }

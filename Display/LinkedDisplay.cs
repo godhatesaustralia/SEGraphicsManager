@@ -34,9 +34,10 @@ namespace IngameScript
         protected Dictionary<IMyTextSurface, HashSet<string>> CommandUsers;
 
         public UpdateFrequency UpdateFrequency;
+        public Priority Priority;
         public Dictionary<string, Action<SpriteData>> Commands;
         public Dictionary<IMyTextSurface, Dictionary<string, SpriteData>> Outputs;
-        public Dictionary<IMyTextSurface, UpdateFrequency> RefreshFreqencies;
+        public Dictionary<IMyTextSurface, Priority> Refresh;
         public string Name;
         public long dEID;
 
@@ -44,7 +45,7 @@ namespace IngameScript
 
         public abstract void Setup(IMyTerminalBlock block);
 
-        public abstract void Update(ref UpdateType sourceFlags);
+        public abstract void Update(ref Priority p);
 
         protected void DrawNewSprite(ref MySpriteDrawFrame frame, SpriteData data)
         {
@@ -69,7 +70,7 @@ namespace IngameScript
         {
             Commands = commandsDict;
             CommandUsers = new Dictionary<IMyTextSurface, HashSet<string>>();
-            RefreshFreqencies = new Dictionary<IMyTextSurface, UpdateFrequency>();
+            Refresh = new Dictionary<IMyTextSurface, Priority>();
             Outputs = new Dictionary<IMyTextSurface, Dictionary<string, SpriteData>>();
             Name = block.CustomName;
             dEID = block.EntityId;
@@ -107,10 +108,10 @@ namespace IngameScript
         // and so on
 
         #endregion
-        bool TryAddSprites(ref IMyTextSurface surf, ref Parser myParser, ref byte index, out UpdateFrequency freq)
+        bool TryAddSprites(ref IMyTextSurface surf, ref Parser myParser, ref byte index, out Priority p)
         {
             string sect;
-            freq = Utilities.uDef;
+            p = Priority.None;
             var good = true;
             if (!isSingleScreen)
                 sect = $"{Keys.ScreenSection}_{index}";
@@ -162,20 +163,21 @@ namespace IngameScript
                             if (myParser.hasKey(nametag, Keys.Font))
                                 s.FontID = s.Type == Utilities.dType ? myParser.String(nametag, Keys.Font, "Monospace") : "";
                             // >UPDATE
-                            if (myParser.hasKey(nametag, Keys.Update))
+                            bool old = myParser.hasKey(nametag, Keys.UpdateOld);
+                            if (myParser.hasKey(nametag, Keys.Update) || old)
                             {
-                                var update = myParser.Byte(nametag, Keys.Update, 0);
-                                s.CommandFrequency = (UpdateFrequency)update;
-                                freq |= s.CommandFrequency;
-
+                                var update = old ? myParser.Byte(nametag, Keys.Update, 0) : myParser.Byte(nametag, Keys.Update, 0);
+                                if (update == 4) update = 2; // backwards compatible
+                                s.Priority = (Priority)update;
+                                p |= s.Priority;
                             }
                             else
-                                s.CommandFrequency = Utilities.uDef;
+                                s.Priority = Priority.None;
 
                             // >COMMAND
-                            if (myParser.hasKey(nametag, Keys.Command) && s.CommandFrequency != 0)
+                            if (myParser.hasKey(nametag, Keys.Command) && s.Priority != 0)
                             {
-                                if (s.CommandFrequency != Utilities.uDef && s.CommandString != "")
+                                if (s.Priority != Priority.None && s.CommandString != "")
                                 {
                                     // uID
                                     s.uID = dEID + index + Array.IndexOf(nArray, name);
@@ -187,7 +189,7 @@ namespace IngameScript
                                         s.Append = " " + myParser.String(nametag, Keys.Append);
                                     // >USEBUILDER
                                     s.Builder = !s.Prepend.Equals("") || !s.Append.Equals("");
-                                    s.CommandString = s.CommandFrequency == Utilities.uDef ? "" : myParser.String(nametag, Keys.Command, "!def");
+                                    s.CommandString = s.Priority == Priority.None ? "" : myParser.String(nametag, Keys.Command, "!def");
                                     if (!Commands.ContainsKey(s.CommandString))
                                         throw new Exception($"PARSE FAILURE: sprite {s.Name} on screen {Name} has invalid command {s.CommandString}");
                                     CommandUsers[surf].Add(s.Name);
@@ -205,7 +207,7 @@ namespace IngameScript
                     }
             }
             else scrDefault(surf);
-            Program.Echo($"surface {surf.DisplayName} LOADED, update at {freq}");
+            Program.Echo($"surface {surf.DisplayName} LOADED, priority {p}");
             return good;
         }
 
@@ -239,7 +241,7 @@ namespace IngameScript
             Parser MyParser = new Parser();
             byte index = 0;
             MyIniParseResult Result;
-            var freq = Utilities.uDef;
+            var freq = Priority.None;
             if (MyParser.CustomData(block, out Result))
             {
                 if (block is IMyTextSurface)
@@ -250,7 +252,7 @@ namespace IngameScript
                     isSingleScreen = true;
                     if (TryAddSprites(ref DisplayBlock, ref MyParser, ref index, out freq))
                     {
-                        RefreshFreqencies.Add(DisplayBlock, freq);
+                        Refresh.Add(DisplayBlock, freq);
                     }
                     else scrDefault(DisplayBlock);
 
@@ -267,11 +269,11 @@ namespace IngameScript
                         if (!Outputs.ContainsKey(surface))
                             Outputs.Add(surface, new Dictionary<string, SpriteData>());
                         if (TryAddSprites(ref surface, ref MyParser, ref index, out freq))
-                            RefreshFreqencies.Add(surface, freq);
+                            Refresh.Add(surface, freq);
                         else
                         {
                             scrDefault(surface);
-                            RefreshFreqencies.Add(surface, Utilities.uDef);
+                            Refresh.Add(surface, Priority.None);
                         }
                     }
                 }
@@ -290,24 +292,23 @@ namespace IngameScript
                 frame.Dispose();
             }
 
-            foreach (var ufrq in RefreshFreqencies.Values)
+            foreach (var ufrq in Refresh.Values)
             {
                 // Program.Echo($"{UpdateFrequency} |= {ufrq}");
-                UpdateFrequency |= ufrq;
+                //UpdateFrequency |= ufrq;
+                Priority |= (Priority)((byte)ufrq);
                 // Program.Echo($"{UpdateFrequency}");
             }
 
         }
 
-        public override void Update(ref UpdateType sourceFlags)
+        public override void Update(ref Priority p)
         {
-            var sourceFreqFlags = Utilities.Converter(sourceFlags);
             foreach (var display in Outputs)
-                if ((RefreshFreqencies[display.Key] & sourceFreqFlags) != 0) //is display frequency the same as frequency of update cycleSrc?
+                if ((Refresh[display.Key] & p) != 0) //is display priority the same as current update's priority?
                 {                                                                   // i.e. do we update display on this tick
-                    //Program.Me.CustomData += $"UPDATED {display}, {Program.Runtime.TimeSinceLastRun}\n";
                     foreach (var name in display.Value.Keys)
-                        if (CommandUsers[display.Key].Contains(name) && (display.Value[name].CommandFrequency & sourceFreqFlags) != 0) //is command frequency the same as frequency of update cycleSrc?
+                        if (CommandUsers[display.Key].Contains(name) && (display.Value[name].Priority & p) != 0) //is command priority the same as current update priority?
                         {
                             display.Value[name].Command.Invoke(display.Value[name]);
                             if (display.Value[name].Builder)

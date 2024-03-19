@@ -7,14 +7,14 @@ namespace IngameScript
         string tag = "GCM";
         public Program()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update100 | UpdateFrequency.Update1;
+            Runtime.UpdateFrequency = UpdateFrequency.Update1;
             Manager = new GraphicsManager(this, tag);
 
             Manager.useCustomDisplays = true;
             Manager.Keys = new IniKeys();
 
             
-            InventoryUtilities inv = new InventoryUtilities(this, tag);
+            InventoryUtilities inv = new InventoryUtilities(this, Manager, tag);
             Manager.InfoUtilities.Add(inv);
             Manager.InfoUtilities.Add(new FlightUtilities());
             Manager.InfoUtilities.Add(new GasUtilities(inv));

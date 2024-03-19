@@ -14,7 +14,7 @@ namespace IngameScript
         public SpriteType Type;
         public TextAlignment Alignment;
         public Action<SpriteData> Command;
-        public UpdateFrequency CommandFrequency;
+        public Priority Priority;
         public long uID = -1; // this field is only set if sprite is using a command.
         public float
             SizeX,
@@ -43,14 +43,14 @@ namespace IngameScript
         public SpriteData()
         {
             Type = Utilities.dType;
-            CommandFrequency = Utilities.uDef;
+            Priority = Priority.None;
             Command = null;
             uID = -1;
             Builder = false;
             Prepend = Append = "";
         }
 
-        public SpriteData(SpriteType type, string name, string data, float sizeX, float sizeY, TextAlignment align, float posX, float posY, float ros, Color color, string font = "White", UpdateFrequency updateType = UpdateFrequency.None, string command = "", bool builder = false, string prepend = "", string append = "")
+        public SpriteData(SpriteType type, string name, string data, float sizeX, float sizeY, TextAlignment align, float posX, float posY, float ros, Color color, string font = "White", Priority p = Priority.None, string command = "", bool builder = false, string prepend = "", string append = "")
         {
             Type = type;
             Name = name;    
@@ -63,7 +63,7 @@ namespace IngameScript
             RorS = ros;
             Color = color;
             FontID = font;
-            CommandFrequency = updateType; //NONE = 0, 1 = 1, 10 = 2, 100 = 4, ONCE = 8
+            Priority = p; //NONE = 0,  high (every 10) = 1, low = 2
             CommandString = command;
             Builder = builder;
             Prepend = prepend;

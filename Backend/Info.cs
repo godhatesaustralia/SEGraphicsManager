@@ -144,7 +144,7 @@ namespace IngameScript
             commands.Add("!ice", (b) =>
             {// ONLY USE WITH UPDATE100
                 var rate = 0d;
-                b.Data = Inventory.TryGetUseRate(ref Ice, ref savedIce, ref InventoryUtilities.InventoryBlocks, out rate) ? $"{rate:000.0} kg/s" : "0 kg/s";
+                b.Data = Inventory.TryGetUseRate<IMyTerminalBlock>(ref Ice, ref savedIce, out rate) ? $"{rate:000.0} kg/s" : "0 kg/s";
             });
              
         }
@@ -221,12 +221,14 @@ namespace IngameScript
         public IMyProgrammableBlock Reference;
         public static string myObjectBuilder = "MyObjectBuilder";
         public string Section;
-        public static List<IMyTerminalBlock>InventoryBlocks = new List<IMyTerminalBlock>();
+        public List<IMyTerminalBlock>InventoryBlocks = new List<IMyTerminalBlock>();
         public Dictionary<long, InventoryItem[]> ItemStorage = new Dictionary<long, InventoryItem[]>();
+        GraphicsManager Host;
 
-        public InventoryUtilities(MyGridProgram program, string s)
+        public InventoryUtilities(MyGridProgram program, GraphicsManager h, string s)
         {
             Section = s;
+            Host = h;
             Reference = program.Me;      
         }
 
@@ -395,6 +397,7 @@ namespace IngameScript
                 if (block.HasInventory && block.IsSameConstructAs(Reference))
                 {
                     var i = block.GetInventory();
+                    if (i.CurrentVolume.RawValue == 0) continue;
                     if (!i.ContainItems(1, item.Type))
                         continue;
                     amount += i.GetItemAmount(item.Type).ToIntSafe();
@@ -404,13 +407,16 @@ namespace IngameScript
             return true;
         }
 
-        public bool TryGetUseRate<T>(ref InventoryItem item, ref Queue<double> storage, ref List<T> blocks, out double rate)
-            where T : IMyTerminalBlock
+        public bool TryGetUseRate<T>(ref InventoryItem item, ref Queue<double> storage, out double rate, List<T> invs = null)
+            where T: IMyTerminalBlock
         {       
             if (storage.Count == 10) // whatever
                 storage.Dequeue();
             rate = 0d;
-            TryGetItem(ref blocks, ref item);
+            if (invs  == null)
+                TryGetItem(ref InventoryBlocks, ref item);
+            else
+                TryGetItem(ref invs, ref item);
             storage.Enqueue(item.Quantity);
             if (storage.Count < 10)
                 return false;
@@ -471,7 +477,14 @@ namespace IngameScript
             base.Reset(program);
             InventoryBlocks.Clear();
             ItemStorage.Clear();
-            TerminalSystem.GetBlocksOfType(InventoryBlocks, (b) => b.HasInventory);    
+            //var p = new Parser();
+            //MyIniParseResult result;
+            TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
+            {
+                var i = b.HasInventory;
+                if (i) InventoryBlocks.Add(b);
+                return i;
+             });    
         }
 
         public override void RegisterCommands(ref Dictionary<string, Action<SpriteData>> commands)
@@ -502,15 +515,22 @@ namespace IngameScript
                     AddItemGroup(b.uID, "ingots");
                 UpdateItemGroup(b.uID, ref b.Data);
             });
-            commands.Add("debug", (b) =>
+            commands.Add("!invdebug", (b) =>
             {
-                string debug = string.Empty;
-                foreach (var kvp in ItemStorage)
-                {
-                    var item = kvp.Value[0];
-                    var s  = kvp.Key.ToString();
-                    debug += s[0]+ "..." + s.Substring(10) + " " + item.Type.SubtypeId.ToUpper() + ", " + TryGetItem(ref InventoryBlocks, ref item) + '\n';
-                } b.Data = debug;
+                if (!justStarted) return;
+                string debug = "";
+                //foreach (var kvp in ItemStorage)
+                //{
+                //    var item = kvp.Value[0];
+                //    var s  = kvp.Key.ToString();
+                //    debug += s[0]+ "..." + s.Substring(10) + " " + item.Type.SubtypeId.ToUpper() + ", " + TryGetItem(ref InventoryBlocks, ref item) + '\n';
+                //}
+                var c = 0;
+                foreach (var item in ItemStorage)
+                    foreach (var item2 in item.Value)
+                        c++;
+                debug += $"{InventoryBlocks.Count} INVENTORIES\n{c} TRACKED ITEMS\n{InventoryBlocks.Count * c} APPROX QUERIES";
+                b.Data = debug;
             });
 
             commands.Add("!components", (b) =>
@@ -709,7 +729,7 @@ namespace IngameScript
             commands.Add("!fission", (b) =>
             {
                 var rate = 0d;
-                b.Data = Inventory.TryGetUseRate(ref uraniumIngot, ref savedUranium, ref Reactors, out rate) ? $"{rate:000.0} KG/S" : "0 KG/S";
+                b.Data = Inventory.TryGetUseRate(ref uraniumIngot, ref savedUranium, out rate, Reactors) ? $"{rate:000.0} KG/S" : "0 KG/S";
             });
 
             commands.Add("!reactorstat", (b) =>

@@ -12,7 +12,7 @@
     <Compile Include="$(MSBuildThisFileDirectory)CommandLine.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)GraphicsManager.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Info.cs" />
-    <Compile Include="$(MSBuildThisFileDirectory)Listener.cs" />
+    <Compile Include="$(MSBuildThisFileDirectory)Priority.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)Parser.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)WCPBAPI.cs" />
   </ItemGroup>

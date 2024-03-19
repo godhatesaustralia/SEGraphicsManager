@@ -87,7 +87,7 @@ namespace IngameScript
                     encodedOutput += $"new SpriteData({sprite.Type}, {sprite.Name}, {sprite.Data}, {(sprite.Type != SpriteType.TEXT ? sprite.SizeX + comma + sprite.SizeY + comma : "")}" +
                         $"TextAlignment.{sprite.Alignment.ToString().ToUpper()}, {sprite.PosX}, {sprite.PosY}, " +
                         $"{sprite.RorS}, new Color({sprite.Color.R}, {sprite.Color.G}, {sprite.Color.B}, {sprite.Color.A}){(sprite.Type != SpriteType.TEXT ? "" : comma + sprite.FontID)}" +
-                        $"{(sprite.CommandFrequency != UpdateFrequency.None ? comma + sprite.CommandFrequency.ToString() + comma + sprite.CommandString + comma + sprite.Builder + (sprite.Builder ? comma + sprite.Prepend + comma + sprite.Append : "") : "")});\n";
+                        $"{(sprite.Priority != Priority.None ? comma + sprite.Priority.ToString() + comma + sprite.CommandString + comma + sprite.Builder + (sprite.Builder ? comma + sprite.Prepend + comma + sprite.Append : "") : "")});\n";
                 }
             }
             return encodedOutput;
@@ -113,6 +113,7 @@ namespace IngameScript
             Font,
             Command,
             Update,
+            UpdateOld,
             Prepend,
             Append;
         public char
@@ -135,7 +136,8 @@ namespace IngameScript
             Color = "COLOR";
             Font = "FONT";
             Command = "CMD";
-            Update = "UPDT";
+            Update = "PRIORITY";
+            UpdateOld = "UPDT";
             Prepend = "PREP";
             Append = "APP";
         }

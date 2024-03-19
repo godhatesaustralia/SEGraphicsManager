@@ -114,11 +114,11 @@ namespace IngameScript
         //    aKy = keymod(aSct, aKy);
         //    return myIni.Get(aSct, aKy).ToInt32(def);
         //}
-        //public bool Bool(string aSct, string aKy, bool def = false)
-        //{
-        //    aKy = keymod(aSct, aKy);
-        //    return myIni.Get(aSct, aKy).ToBoolean(def);
-        //}
+        public bool Bool(string aSct, string aKy, bool def = false)
+        {
+            aKy = keymod(aSct, aKy);
+            return myIni.Get(aSct, aKy).ToBoolean(def);
+        }
         public string String(string aSct, string aKy, string def = "")
         {
             aKy = keymod(aSct, aKy);
