@@ -130,7 +130,7 @@ namespace IngameScript
             byte r, g, b, a;
             def = myIni.Get(aSct, aKy).ToString(def).ToLower();
             if (def.Length != 8) 
-                return Utilities.dColor; //safety
+                return Util.dColor; //safety
             r = Hex(def, 0, 2);
             g = Hex(def, 2, 2);
             b = Hex(def, 4, 2);

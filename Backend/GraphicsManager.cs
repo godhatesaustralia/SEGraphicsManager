@@ -40,32 +40,21 @@ namespace IngameScript
         public IMyProgrammableBlock Me;
         public long
         Frame,
-        RuntimeMSRounded;
+        WorstFrame;
         public double RuntimeMS, WorstRun, AverageRun;
         public string Tag, GCM, Name;
-        public TimeSpan Reference;
-        public Dictionary<string, Action<SpriteData>> Commands;
-        public List<DisplayBase> Displays, Pr10, Pr100;
-        public HashSet<InfoUtility> InfoUtilities; //hash set for now
+        Dictionary<string, Action<SpriteData>> Commands;
+        List<DisplayBase> Displays, FastDisplays, Static;
+        public List<InfoUtility> InfoUtilities; //hash set for now
+        public InventoryUtilities Inventory;
         public List<IMyTerminalBlock> Blocks = new List<IMyTerminalBlock>();
         HashSet<IMyTerminalBlock> DisplayBlocks = new HashSet<IMyTerminalBlock>();
-        Queue<double> runtimes = new Queue<double>();
-
+        double totalRt;
         public IniKeys Keys;
         StringBuilder Builder;
-        int ptr, min = 128;
-        int Current
-        {
-            get
-            {
-                if (ptr < Displays.Count)
-                    ptr++;
-                if (ptr == Displays.Count)
-                    ptr = 0;
-                return ptr;
-            }
-        }
-        bool frozen = false, classic = false, setupComplete = false, didThis = false;
+        int dPtr, iPtr, min = 128;
+
+        bool frozen = false, setupComplete, draw;
         #endregion
 
         public GraphicsManager(MyGridProgram program, string t)
@@ -76,7 +65,8 @@ namespace IngameScript
             Me = program.Me;
             Commands = new Dictionary<string, Action<SpriteData>>();
             Displays = new List<DisplayBase>();
-            InfoUtilities = new HashSet<InfoUtility>();
+            Static = new List<DisplayBase>();
+            InfoUtilities = new List<InfoUtility>();
             Builder = new StringBuilder();
             Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
             var p = new Parser();
@@ -85,37 +75,39 @@ namespace IngameScript
             {
                 Tag = p.String(GCM, "tag", GCM);
                 Name = p.String(GCM, "group name", "Screen Control");
-                classic = !p.Bool(GCM, "cycle", true);
-                if (classic)
-                    Pr10 = null;
-                else
-                    Pr10 = new List<DisplayBase>(p.Byte(GCM, "p10", 2));
+                FastDisplays = new List<DisplayBase>(p.Byte(GCM, "fast", 2));
             }
             else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
             Commands.Add("!def", (b) => { return; });
         }
 
-        public void Clear()
+        public void Clear(bool auto)
         {
-            Commands.Clear();
+            dPtr = -1;
+            if (auto) Commands.Clear();
             Displays.Clear();
             Blocks.Clear();
             DisplayBlocks.Clear();
         }
 
 
-        public void Init()
+        public void Init(bool auto = true)
         {
-            Clear();
-            Frame = 0;
-            RuntimeMSRounded = 0;
-            RuntimeMS = 0;
+            setupComplete = false;
+            Clear(auto);
             Terminal.GetBlocksOfType(Blocks);
-
+            Inventory.Reset(Program);
             foreach (InfoUtility utility in InfoUtilities)
                 utility.Reset(Program);
-            foreach (InfoUtility utility in InfoUtilities)
-                utility.RegisterCommands(ref Commands);
+
+            if (auto)
+            {
+                Frame = WorstFrame = 0;
+                RuntimeMS = WorstRun = AverageRun = totalRt = 0;
+                Inventory.Setup(ref Commands);
+                foreach (InfoUtility utility in InfoUtilities)
+                    utility.Setup(ref Commands);
+            }
 
             if (useCustomDisplays)
             {
@@ -127,75 +119,64 @@ namespace IngameScript
                 g.GetBlocks(l);
                 DisplayBlocks = l.ToHashSet();
                 Program.Echo("If you want to actually read this, get Digi's Build Info mod and use it to copy this text.\nThe requisite button should be to the bottom right of where this text is showing up.\n\n");
-                if (classic)
-                {
-                    
-                    foreach (var block in DisplayBlocks)
-                    {
-                        var d = new LinkedDisplay(block, ref Commands, ref Program, ref Keys);
-                        d.Setup(block);
-                        Displays.Add(d);
-                    }                
-                    DisplayBlocks.Clear();
-                }
-                setupComplete = classic;
-                InfoUtility.justStarted = !classic;
-            }
-        }
-
-        void createDisplay(IMyTerminalBlock b)
-        {
-            var d = new LinkedDisplay(b, ref Commands, ref Program, ref Keys);
-            d.Setup(b);
-            DisplayBlocks.Remove(b);
-            if (classic)
-                Displays.Add(d);
-            else
-            {
-                var p = (byte)d.Priority;
-                if (p == 1 && Pr10.Count < Pr10.Capacity)
-                    Pr10.Add(d);
-                else if (p != 0)
-                    Displays.Add(d);
             }
         }
 
         void UpdateTimes()
         {
-            Reference = Program.Runtime.TimeSinceLastRun;
-            RuntimeMS += Reference.TotalMilliseconds;
-            RuntimeMSRounded = (long)RuntimeMS;
+            RuntimeMS += Program.Runtime.TimeSinceLastRun.TotalMilliseconds;
+            //RuntimeMSRounded = (long)RuntimeMS;
             Frame++;
         }
 
         void RunSetup()
         {
             if (DisplayBlocks == null || DisplayBlocks.Count == 0)
-            { setupComplete = true; InfoUtility.justStarted = false; }
+            {
+                setupComplete = true; InfoUtility.justStarted = false;
+            }
             else
-                createDisplay(DisplayBlocks.First());
+            {
+                var b = DisplayBlocks.First();
+                var d = new LinkedDisplay(b, ref Commands, ref Program, ref Keys);
+                d.Setup(b);
+                DisplayBlocks.Remove(b);
+                var p = d.Priority;
+                if (p == Priority.High && FastDisplays.Count < FastDisplays.Capacity)
+                    FastDisplays.Add(d);
+                else if ((p & Priority.High) != 0)
+                    Displays.Add(d);
+                else Static.Add(d);
+            }
+        }
+        void DataCycle(ref Priority p)
+        {
+            if (!Inventory.updated)
+                Inventory.Update();
+            draw = iPtr == 0;
+            InfoUtilities[Util.Next(ref iPtr, InfoUtilities.Count)].Update();
+        }
+        void DrawCycle(ref Priority p)
+        {
+            Displays[Util.Next(ref dPtr, Displays.Count)].Update(ref p);
+            if (dPtr == 0)
+                Inventory.updated = draw = false;
         }
 
-        void FastDraw(ref Priority p)
+        void Reset(ref List<DisplayBase> ds)
         {
-            if ((p & Priority.High) != 0 && Pr10.Count > 0)
-                foreach (var d in Pr10)
-                    d.Update(ref p);
+            if (ds.Count > 0)
+                foreach(var d in ds)
+                    d.Reset();
+        }
 
-            Displays[Current].Update(ref p);
-        }
-        void ClassicDraw(ref Priority p)
-        {
-            foreach (var d in Displays)
-                d.Update(ref p);
-        }
         public void Update(string arg, UpdateType source)
         {
             UpdateTimes();
-            if (!classic && !setupComplete)
+            if (!setupComplete)
                 RunSetup();
-            Priority p = Priority.Low;
-            p |= Frame % 10 == 0 ? Priority.High : Priority.None;
+            Priority p = Priority.Normal;
+            p |= Frame % 10 == 0 ? Priority.Fast : Priority.None;
             if (arg != "")
             {
                 arg = arg.ToLower();
@@ -203,7 +184,7 @@ namespace IngameScript
                 {
                     case "reset":
                         {
-                            Init();
+                            Init(false);
                             break;
                         }
                     case "freeze":
@@ -216,37 +197,46 @@ namespace IngameScript
                             }
                             else
                             {
-                                Program.Runtime.UpdateFrequency = Utilities.uDef;
+                                Program.Runtime.UpdateFrequency = Util.uDef;
                                 frozen = true;
                                 break;
                             }
                         }
-
+                    case "flick":
+                        {
+                            Reset(ref FastDisplays);
+                            Reset(ref Displays);
+                            Reset(ref Static);
+                            Init(false);
+                            break;
+                        }
                     default: { break; }
                 }
             }
             if (!setupComplete) return;
-            if (classic)
-                ClassicDraw(ref p);
+            if ((p & Priority.Fast) != 0)
+                foreach (var d in FastDisplays)
+                    d.Update(ref p);
+            if (!draw)
+                DataCycle(ref p);
             else
-                FastDraw(ref p);
-            if (Frame > min)
+                DrawCycle(ref p);
+
+            var rt = Program.Runtime.LastRunTimeMs;
+            if (WorstRun < rt) { WorstRun = rt; WorstFrame = Frame; }
+            totalRt += rt;
+            if (true)
             {
-                var rt = Program.Runtime.LastRunTimeMs;
-                runtimes.Enqueue(rt);
-                if (runtimes.Count > 10) runtimes.Dequeue();
-                if (Frame % 10 == 0)
-                {
-                    foreach (var t in runtimes)
-                        AverageRun += t;
-                    AverageRun /= runtimes.Count;
-                }
-                if (WorstRun < rt) WorstRun = rt;
+                if ((p & Priority.Fast) != 0)
+                    AverageRun = totalRt / Frame;
                 string n = "";
                 foreach (var d in Displays)
                     n += $"{d.Name}\n";
-                string r = $"[[GRAPHICS MANAGER]]\n{(classic ? "CLASSIC" : "PERFORMANCE")} MODE\n";
-                r += $"RUNS - {Frame}\nSRC - {source}" + $"\nAVG RUNTIME - {AverageRun.ToString("0.####")} ms\nWORST RUNTIME - {WorstRun} ms\nACTIVE SCREENS - {n}";
+                string r = "[[GRAPHICS MANAGER]]\n\n";
+                if (draw) r += $"DRAWING DISPLAY {dPtr}/{Displays.Count}";
+                else
+                    r += $"INV {Inventory.Pointer}/{Inventory.Items.Count} | {InfoUtilities[iPtr].Name} - UTILS {iPtr}/{InfoUtilities.Count}";
+                r += $"\nRUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun.ToString("0.####")} ms\nWORST - {WorstRun} ms, F{WorstFrame}\n";
                 Program.Echo(r);
             }
         }

@@ -5,20 +5,19 @@ namespace IngameScript
     {
         public GraphicsManager Manager;
         string tag = "GCM";
+        string format = "0000";
         public Program()
         {
-            Runtime.UpdateFrequency = UpdateFrequency.Update1;
             Manager = new GraphicsManager(this, tag);
 
             Manager.useCustomDisplays = true;
             Manager.Keys = new IniKeys();
 
             
-            InventoryUtilities inv = new InventoryUtilities(this, Manager, tag);
-            Manager.InfoUtilities.Add(inv);
-            Manager.InfoUtilities.Add(new FlightUtilities());
-            Manager.InfoUtilities.Add(new GasUtilities(inv));
-            Manager.InfoUtilities.Add(new PowerUtilities(inv));
+            Manager.Inventory = new InventoryUtilities(this, tag);
+            Manager.InfoUtilities.Add(new FlightUtilities(format));
+            Manager.InfoUtilities.Add(new GasUtilities(ref Manager.Inventory));
+            Manager.InfoUtilities.Add(new PowerUtilities(Manager.Inventory));
             Manager.InfoUtilities.Add(new WeaponUtilities(Manager.Tag));
             Manager.Init();
         }

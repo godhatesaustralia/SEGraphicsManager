@@ -33,7 +33,6 @@ namespace IngameScript
         protected MyGridProgram Program;
         protected Dictionary<IMyTextSurface, HashSet<string>> CommandUsers;
 
-        public UpdateFrequency UpdateFrequency;
         public Priority Priority;
         public Dictionary<string, Action<SpriteData>> Commands;
         public Dictionary<IMyTextSurface, Dictionary<string, SpriteData>> Outputs;
@@ -42,6 +41,19 @@ namespace IngameScript
         public long dEID;
 
         #endregion
+
+        public void Reset()
+        {
+            Refresh.Clear();
+            CommandUsers.Clear();
+            foreach (var scr in Outputs.Keys)
+            {
+                var f = scr.DrawFrame();
+                f.Add(new MySprite());
+                f.Dispose();
+            }
+            Outputs.Clear();
+        }
 
         public abstract void Setup(IMyTerminalBlock block);
 
@@ -156,18 +168,18 @@ namespace IngameScript
                             //COLOR
                             s.Color = myParser.Color(nametag, Keys.Color);
                             // >ROTATION/SCALE
-                            s.RorS = myParser.Float(nametag, (s.Type == Utilities.dType ? Keys.Scale : Keys.Rotation), float.NaN);
+                            s.RorS = myParser.Float(nametag, (s.Type == Util.dType ? Keys.Scale : Keys.Rotation), float.NaN);
                             if (float.IsNaN(s.RorS))
-                                s.RorS = myParser.Float(nametag, (s.Type == Utilities.dType ? Keys.Rotation : Keys.Scale));
+                                s.RorS = myParser.Float(nametag, (s.Type == Util.dType ? Keys.Rotation : Keys.Scale));
                             // >FONT
                             if (myParser.hasKey(nametag, Keys.Font))
-                                s.FontID = s.Type == Utilities.dType ? myParser.String(nametag, Keys.Font, "Monospace") : "";
+                                s.FontID = s.Type == Util.dType ? myParser.String(nametag, Keys.Font, "Monospace") : "";
                             // >UPDATE
                             bool old = myParser.hasKey(nametag, Keys.UpdateOld);
+
                             if (myParser.hasKey(nametag, Keys.Update) || old)
                             {
                                 var update = old ? myParser.Byte(nametag, Keys.Update, 0) : myParser.Byte(nametag, Keys.Update, 0);
-                                if (update == 4) update = 2; // backwards compatible
                                 s.Priority = (Priority)update;
                                 p |= s.Priority;
                             }
@@ -229,7 +241,7 @@ namespace IngameScript
                 sprite.PosY = float.Parse(coords.Last().Trim(Keys.r_coord));
             }
 
-            else if (key == Keys.Size && sprite.Type != Utilities.dType)
+            else if (key == Keys.Size && sprite.Type != Util.dType)
             {
                 sprite.SizeX = float.Parse(coords.First().Trim(Keys.l_coord));
                 sprite.SizeY = float.Parse(coords.Last().Trim(Keys.r_coord));
@@ -241,7 +253,7 @@ namespace IngameScript
             Parser MyParser = new Parser();
             byte index = 0;
             MyIniParseResult Result;
-            var freq = Priority.None;
+            var pri = Priority.None;
             if (MyParser.CustomData(block, out Result))
             {
                 if (block is IMyTextSurface)
@@ -250,9 +262,9 @@ namespace IngameScript
                     Outputs.Add(DisplayBlock, new Dictionary<string, SpriteData>());
 
                     isSingleScreen = true;
-                    if (TryAddSprites(ref DisplayBlock, ref MyParser, ref index, out freq))
+                    if (TryAddSprites(ref DisplayBlock, ref MyParser, ref index, out pri))
                     {
-                        Refresh.Add(DisplayBlock, freq);
+                        Refresh.Add(DisplayBlock, pri);
                     }
                     else scrDefault(DisplayBlock);
 
@@ -268,8 +280,8 @@ namespace IngameScript
                         var surface = DisplayBlock.GetSurface(index);
                         if (!Outputs.ContainsKey(surface))
                             Outputs.Add(surface, new Dictionary<string, SpriteData>());
-                        if (TryAddSprites(ref surface, ref MyParser, ref index, out freq))
-                            Refresh.Add(surface, freq);
+                        if (TryAddSprites(ref surface, ref MyParser, ref index, out pri))
+                            Refresh.Add(surface, pri);
                         else
                         {
                             scrDefault(surface);
@@ -292,11 +304,11 @@ namespace IngameScript
                 frame.Dispose();
             }
 
-            foreach (var ufrq in Refresh.Values)
+            foreach (var val in Refresh.Values)
             {
-                // Program.Echo($"{UpdateFrequency} |= {ufrq}");
-                //UpdateFrequency |= ufrq;
-                Priority |= (Priority)((byte)ufrq);
+                // Program.Echo($"{UpdateFrequency} |= {val}");
+                //UpdateFrequency |= val;
+                Priority |= (Priority)((byte)val);
                 // Program.Echo($"{UpdateFrequency}");
             }
 
@@ -307,12 +319,12 @@ namespace IngameScript
             foreach (var display in Outputs)
                 if ((Refresh[display.Key] & p) != 0) //is display priority the same as current update's priority?
                 {                                                                   // i.e. do we update display on this tick
-                    foreach (var name in display.Value.Keys)
-                        if (CommandUsers[display.Key].Contains(name) && (display.Value[name].Priority & p) != 0) //is command priority the same as current update priority?
+                    foreach (var n in display.Value.Keys)
+                        if (CommandUsers[display.Key].Contains(n)) //is command priority the same as current update priority?
                         {
-                            display.Value[name].Command.Invoke(display.Value[name]);
-                            if (display.Value[name].Builder)
-                                InfoUtility.ApplyBuilder(display.Value[name]);
+                            display.Value[n].Command.Invoke(display.Value[n]);
+                            if (display.Value[n].Builder)
+                                InfoUtility.ApplyBuilder(display.Value[n]);
                         }//i.e. do we run command on this tick
                     var frame = display.Key.DrawFrame();
                     foreach (var sprite in display.Value)

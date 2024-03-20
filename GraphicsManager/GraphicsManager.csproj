@@ -49,6 +49,7 @@
     <AdditionalFiles Include="Instructions.readme" />
     <AdditionalFiles Include="thumb.png" />
     <AdditionalFiles Include="MDK\whitelist.cache" />
+    <Compile Include="temp.cs" />
   </ItemGroup>
   <Import Project="..\Backend\Backend.projitems" Label="Shared" />
   <Import Project="..\Display\Display.projitems" Label="Shared" />

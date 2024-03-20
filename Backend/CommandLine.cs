@@ -39,7 +39,7 @@ namespace IngameScript
 
         //public string JoinArguments(INTStringBuilder builder, int start, int end)
         //{
-        //    builder.Clear();
+        //    builder.Reset();
         //    int termination = Math.Max(ArgumentCount - 1, end);
         //    for (int i = start; i <= termination; ++i)
         //    {

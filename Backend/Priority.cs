@@ -23,9 +23,10 @@ namespace IngameScript
     [Flags]
     public enum Priority : byte
     {
-        None = 0,
-        High = 1,
-        Low = 2,
+        None,
+        Normal,
+        Fast,
+        High 
     }
 
 }

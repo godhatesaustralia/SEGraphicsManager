@@ -42,7 +42,7 @@ namespace IngameScript
 
         public SpriteData()
         {
-            Type = Utilities.dType;
+            Type = Util.dType;
             Priority = Priority.None;
             Command = null;
             uID = -1;
@@ -76,7 +76,7 @@ namespace IngameScript
                 return d.sprCached;
             else
             {
-                var sprite = d.Type == Utilities.dType ? new MySprite(
+                var sprite = d.Type == Util.dType ? new MySprite(
                 d.Type,
                 d.Data,
                 new Vector2(d.PosX, d.PosY),

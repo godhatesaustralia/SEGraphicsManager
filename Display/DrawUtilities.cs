@@ -30,34 +30,19 @@ using VRageRender;
 
 namespace IngameScript
 {
-    public static class Utilities
+    public static class Util
     {
-        static public int increment = 9;
         static public SpriteType dType = SpriteType.TEXT;
-        static public UpdateFrequency
-            uDef = UpdateFrequency.None,
-            u10 = UpdateFrequency.Update10,
-            u100 = UpdateFrequency.Update100;
+        static public UpdateFrequency uDef = UpdateFrequency.None;
         static public Color dColor = Color.HotPink;
-
-
-        public static UpdateFrequency Converter(UpdateType source)
+        public static int Next(ref int p, int max)
         {
-            var updateFrequency = UpdateFrequency.None; //0000
-            if ((source & UpdateType.Update1) != 0) updateFrequency |= UpdateFrequency.Update1; //0001
-            if ((source & UpdateType.Update10) != 0) updateFrequency |= UpdateFrequency.Update10; //0010
-            if ((source & UpdateType.Update100) != 0) updateFrequency |= UpdateFrequency.Update100;//0100
-            return updateFrequency;
+            if (p < max)
+                p++;
+            if (p == max)
+                p = 0;
+            return p;
         }
-        public static UpdateType LConverter(UpdateFrequency f)
-        {
-            var u = UpdateType.None; //0000
-            if ((f & UpdateFrequency.Update1) != 0) u |= UpdateType.Update1; //0001
-            if ((f & u10) != 0) u |= UpdateType.Update10; //0010
-            if ((f & u100) != 0) u |= UpdateType.Update100;//0100
-            return u;
-        }
-
         public static void CreateBarGraph(ref SpriteData d)
         {
             bool horizontal = d.SizeX > d.SizeY || d.SizeX == d.SizeY;
