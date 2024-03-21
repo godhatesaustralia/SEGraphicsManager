@@ -90,36 +90,11 @@ namespace IngameScript
             Keys = keys;
         }
 
-        #region CustomDataFormat
 
         // [Custom Data Formatting]
-        //
-        // I didn't want the list...but look, it simplifies parsing custom data SO, so much
-        // split at '>', trim at '\n'
-        //
-        //[SECT_SCREEN_0]
-        // K_COLOR_BG FA6464FF
-        // K_LIST = 
-        // |>FRAME
-        //[SECT_SPRITE_FRAME]
-        // K_TYPE = {byte 0/2/4} => if this is 2, we can skip size section
-        // K_DATA = SquareSimple
-        // K_SIZE = (50, 50)
-        // K_ALIGN = 2 => {byte 0/1/2}
-        // K_COORD = (256, 256) => ALWAYS in screen coordinates
-        // K_ROTSCAL = 0
-        // K_COLOR = FA6464FF
-        // K_FONT = "White" => don't even LOOK for this if it's a texture
-        // K_UPDATE = 0x1
-        // K_CMD = !...
-        // K_BUILD = false
-        // K_PREP = default
-        // K_APP = default
-        // [SECT_SPRITE_TOPBAR]
-        //   ...
-        // and so on
+        // ...
+        // read the pdf u moron. u absolute buffooon
 
-        #endregion
         bool TryAddSprites(ref IMyTextSurface surf, ref Parser myParser, ref byte index, out Priority p)
         {
             string sect;
@@ -131,25 +106,31 @@ namespace IngameScript
                 sect = Keys.ScreenSection;
             Program.Echo(sect);
             CommandUsers.Add(surf, new HashSet<string>());
-            if (myParser.hasSection(sect))
+            if (!myParser.hasSection(sect))
+                return false;
+            else
             {
-                surf.ContentType = ContentType.SCRIPT;
                 surf.Script = "";
                 surf.ScriptBackgroundColor = myParser.Color(sect, Keys.Color + "_BG");
-                var names = myParser.String(sect, Keys.List);
+                var fail = "~";
+                var names = myParser.String(sect, Keys.List, fail);
+                if (names == fail)
+                {
+                    Default(ref surf);
+                    return false;
+                }
                 var nArray = names.Split(Keys.new_line);
                 for (int i = 0; i < nArray.Length; ++i)
                 { nArray[i] = nArray[i].Trim(Keys.new_entry); nArray[i] = nArray[i].Trim(); Program.Echo(nArray[i]); }
 
-                if (nArray.Count() > 0)
+                if (nArray.Length > 0)
+                {
+                    surf.ContentType = ContentType.SCRIPT;
                     foreach (var name in nArray)
                     {
-
                         var nametag = $"{Keys.SpriteSection}_{name}";
-
                         if (myParser.hasSection(nametag) && nArray.Contains(name))
                         {
-
                             SpriteData s = new SpriteData();
                             //Name
                             s.Name = name;
@@ -168,9 +149,8 @@ namespace IngameScript
                             //COLOR
                             s.Color = myParser.Color(nametag, Keys.Color);
                             // >ROTATION/SCALE
-                            s.RorS = myParser.Float(nametag, (s.Type == Util.dType ? Keys.Scale : Keys.Rotation), float.NaN);
-                            if (float.IsNaN(s.RorS))
-                                s.RorS = myParser.Float(nametag, (s.Type == Util.dType ? Keys.Rotation : Keys.Scale));
+                            if (s.Type == Util.dType) s.RorS = myParser.Float(nametag, Keys.Scale, 1);
+                            else s.RorS = myParser.Float(nametag, Keys.Scale, 0);
                             // >FONT
                             if (myParser.hasKey(nametag, Keys.Font))
                                 s.FontID = s.Type == Util.dType ? myParser.String(nametag, Keys.Font, "Monospace") : "";
@@ -215,20 +195,34 @@ namespace IngameScript
                                 Outputs[surf].Add(s.Name, s);
                         }
                         else
+                        {
+                            Default(ref surf);
                             good = false;
+                        }
                     }
+                }
+                else Default(ref surf);
             }
-            else scrDefault(surf);
             Program.Echo($"surface {surf.DisplayName} LOADED, priority {p}");
             return good;
         }
 
-        void scrDefault(IMyTextSurface s)
-        {
-            s.ContentType = (ContentType)3;
-            s.Alignment = (TextAlignment)2;
-            var t = $"{Name}\nSURFACE {s.Name}\nSCREEN SIZE {s.SurfaceSize}\nTEXTURE SIZE {s.TextureSize}";
-            s.WriteText(t);
+        private void Default(ref IMyTextSurface s)
+        { 
+            var c = (s.TextureSize - s.SurfaceSize) / 2;
+            var d = new SpriteData();
+            s.ScriptBackgroundColor = Color.Blue;
+            d.Name = Name;
+            d.Data = $"{Name}\nSURFACE {s.Name}\nSCREEN SIZE {s.SurfaceSize}\nTEXTURE SIZE {s.TextureSize}\n\n\n{Util.bsod}";
+            d.FontID = "Monospace";
+            d.Color = Color.White;
+            d.PosX = c.X; 
+            d.PosY = c.Y;
+            d.RorS = 0.4375f;
+            d.sprCached = SpriteData.createSprite(d, true);
+            var f = s.DrawFrame();
+            Outputs[s].Add(Name, d);
+            f.Dispose();
         }
 
         void CartesianReader(ref SpriteData sprite, ref Parser myParser, string key, string nametag)
@@ -260,14 +254,11 @@ namespace IngameScript
                 {
                     var DisplayBlock = (IMyTextSurface)block;
                     Outputs.Add(DisplayBlock, new Dictionary<string, SpriteData>());
-
                     isSingleScreen = true;
                     if (TryAddSprites(ref DisplayBlock, ref MyParser, ref index, out pri))
                     {
                         Refresh.Add(DisplayBlock, pri);
                     }
-                    else scrDefault(DisplayBlock);
-
                 }
                 else if (block is IMyTextSurfaceProvider)
                 {
@@ -277,16 +268,14 @@ namespace IngameScript
 
                     for (index = 0; index < SurfaceCount; ++index)
                     {
+                        if (!MyParser.hasSection($"{Keys.ScreenSection}_{index}")) continue;
                         var surface = DisplayBlock.GetSurface(index);
                         if (!Outputs.ContainsKey(surface))
                             Outputs.Add(surface, new Dictionary<string, SpriteData>());
                         if (TryAddSprites(ref surface, ref MyParser, ref index, out pri))
                             Refresh.Add(surface, pri);
                         else
-                        {
-                            scrDefault(surface);
                             Refresh.Add(surface, Priority.None);
-                        }
                     }
                 }
             }
@@ -306,12 +295,8 @@ namespace IngameScript
 
             foreach (var val in Refresh.Values)
             {
-                // Program.Echo($"{UpdateFrequency} |= {val}");
-                //UpdateFrequency |= val;
                 Priority |= (Priority)((byte)val);
-                // Program.Echo($"{UpdateFrequency}");
             }
-
         }
 
         public override void Update(ref Priority p)

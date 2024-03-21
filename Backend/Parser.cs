@@ -36,6 +36,13 @@ namespace IngameScript
             Result = result; 
             return output;
         }
+
+        public bool CustomData(IMyTerminalBlock block)
+        {
+            var output = myIni.TryParse(block.CustomData, out result);
+            return output;
+        }
+
         public bool hasSection(string aSct)
         {
             return myIni.ContainsSection(aSct);
@@ -140,7 +147,6 @@ namespace IngameScript
         private byte Hex(string input, int start, int length)
         {
             return Convert.ToByte(input.Substring(start, length), 16);
-
         }
         private string keymod(string s, string k)
         {

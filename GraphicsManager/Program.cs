@@ -12,7 +12,6 @@ namespace IngameScript
 
             Manager.useCustomDisplays = true;
             Manager.Keys = new IniKeys();
-
             
             Manager.Inventory = new InventoryUtilities(this, tag);
             Manager.InfoUtilities.Add(new FlightUtilities(format));

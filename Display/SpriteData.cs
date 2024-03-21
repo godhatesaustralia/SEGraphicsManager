@@ -26,7 +26,7 @@ namespace IngameScript
         public string
             Name,
             Data,
-            FontID = "DEBUG",
+            FontID = "White",
             CommandString,
             Prepend,
             Append;
@@ -46,8 +46,15 @@ namespace IngameScript
             Priority = Priority.None;
             Command = null;
             uID = -1;
+            RorS = 1;
+            Color = Util.dColor;
             Builder = false;
             Prepend = Append = "";
+        }
+
+        public SpriteData(long i) : base()
+        {
+            uID = i;
         }
 
         public SpriteData(SpriteType type, string name, string data, float sizeX, float sizeY, TextAlignment align, float posX, float posY, float ros, Color color, string font = "White", Priority p = Priority.None, string command = "", bool builder = false, string prepend = "", string append = "")
