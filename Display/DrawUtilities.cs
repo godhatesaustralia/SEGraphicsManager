@@ -30,8 +30,9 @@ using VRageRender;
 
 namespace IngameScript
 {
-    public static class Util
+    public static class Lib
     {
+        static public Dictionary<long, MyTuple<bool, float>> GraphStorage = new Dictionary<long, MyTuple<bool, float>>();
         static public SpriteType dType = SpriteType.TEXT;
         static public UpdateFrequency uDef = UpdateFrequency.None;
         static public Color dColor = Color.HotPink;
@@ -46,37 +47,44 @@ namespace IngameScript
         }
         public static void CreateBarGraph(ref SpriteData d)
         {
-            bool horizontal = d.SizeX > d.SizeY || d.SizeX == d.SizeY;
-            InfoUtility.GraphStorage.Add(d.uID, new MyTuple<bool, float>(horizontal, horizontal ? d.SizeX : d.SizeY));
+            if (GraphStorage.ContainsKey(d.uID)) 
+                return;
+            bool horizontal = d.sX > d.sY || d.sX == d.sY;
+            GraphStorage.Add(d.uID, new MyTuple<bool, float>(horizontal, horizontal ? d.sX : d.sY));
         }
         public static void UpdateBarGraph(ref SpriteData data, double pctData)
         { 
-            var graph = InfoUtility.GraphStorage[data.uID];
-            if (graph.Item1) data.SizeX = Convert.ToSingle(pctData) * graph.Item2;
-            else data.SizeY = Convert.ToSingle(pctData) * graph.Item2;
+            var graph = GraphStorage[data.uID];
+            if (graph.Item1) data.sX = Convert.ToSingle(pctData) * graph.Item2;
+            else data.sY = Convert.ToSingle(pctData) * graph.Item2;
+        }
+
+        public static void ApplyBuilder(SpriteData d)
+        {
+            StringBuilder builder = new StringBuilder(d.Data);
+            builder.Insert(0, d.Prepend);
+            builder.Append(d.Append);
+            d.Data = builder.ToString();
         }
 
         public static string EncodeSprites(ref LinkedDisplay display)
         // the idea: have this make the requisite SpriteData constructors here bc im too lazy
         // the constructor in question:
-        //  public SpriteData(SpriteType type, string Name, string d, float sizeX, float sizeY, TextAlignment alignment,
-        //  float posX, float posY, float ros, dColor color, string fontid = "White", UpdateFrequency updateType = UpdateFrequency.None,
-        //  string command = "", bool builder = false, string prepend = "") (jesus christ)
+        //   public SpriteData(Color color, string name = "", string data = "", float posX = 0, float posY = 0, float ros = float.MinValue,
+        //   float szX = 0, float szY = 0, string font = "White", Priority p = Priority.None, SpriteType type = SpriteType.TEXT,
+        //   TextAlignment align = TextAlignment.CENTER, string command = "", string prepend = "", string append = "")
         {
-            var encodedOutput = "";
-            var comma = ", ";
+            var eOut = "";
             foreach (var surface in display.Outputs)
             {
-                encodedOutput += $"// screen {surface.Key.Name} background color {surface.Key.BackgroundColor}\n";
-                foreach (var sprite in surface.Value.Values)
+                eOut += $"//\nscreen {surface.Key.Name} background color {surface.Key.BackgroundColor}\n";
+                foreach (var s in surface.Value.Values)
                 {
-                    encodedOutput += $"new SpriteData({sprite.Type}, {sprite.Name}, {sprite.Data}, {(sprite.Type != SpriteType.TEXT ? sprite.SizeX + comma + sprite.SizeY + comma : "")}" +
-                        $"TextAlignment.{sprite.Alignment.ToString().ToUpper()}, {sprite.PosX}, {sprite.PosY}, " +
-                        $"{sprite.RorS}, new Color({sprite.Color.R}, {sprite.Color.G}, {sprite.Color.B}, {sprite.Color.A}){(sprite.Type != SpriteType.TEXT ? "" : comma + sprite.FontID)}" +
-                        $"{(sprite.Priority != Priority.None ? comma + sprite.Priority.ToString() + comma + sprite.CommandString + comma + sprite.Builder + (sprite.Builder ? comma + sprite.Prepend + comma + sprite.Append : "") : "")});\n";
+                    eOut += $"new SpriteData(new Color({s.Color.R}, {s.Color.G}, {s.Color.B}, {s.Color.A}), {s.Name}, {s.Data}, ";
+                    eOut += $"{s.X}, {s.Y}, {s.RorS}, {s.sX}, {s.sY}, {s.FontID}, {s.Priority}, {s.Type}, {s.Alignment}, {s.Command}, {s.Prepend}, {s.Append});\n";
                 }
             }
-            return encodedOutput;
+            return eOut;
         }
 
     }
@@ -84,7 +92,6 @@ namespace IngameScript
     public class IniKeys //avoid allocating new memory for every display (i hope). just seems less dumb.
     {
         public string
-            KeyTag,
             ScreenSection,
             SpriteSection,
             List,
@@ -102,11 +109,10 @@ namespace IngameScript
             UpdateOld,
             Prepend,
             Append;
-        public char
-            l_coord = '(',
-            r_coord = ')',
-            new_line = '\n',
-            new_entry = '>';
+        public readonly char
+            vectorL = '(',
+            vectorR = ')',
+            entry = '>';
         public void ResetKeys() //yes...this is questionable...
         {
             ScreenSection = "SECT_SCREEN";
@@ -123,7 +129,6 @@ namespace IngameScript
             Font = "FONT";
             Command = "CMD";
             Update = "PRIORITY";
-            UpdateOld = "UPDT";
             Prepend = "PREP";
             Append = "APP";
         }

@@ -29,63 +29,49 @@ using VRageRender;
 
 namespace IngameScript
 {
-
-    public class Info
+    public interface IInfo
     {
-        public virtual double Data { get { Active = true; return data; } }
+        double Data { get; }
+        void Update();
+    }
+
+
+    public class Info : IInfo
+    {
+        public double Data => data;
         private double data;
-        private bool Active = false;
+        //private bool Active = false;
         private Func<double> update;
         public Info(Func<double> u)
         {
             update = u;
         }
-        public virtual void Update()
-        {
-            if (!Active) return;
-            data = update.Invoke();
-        }
+        public void Update() => data = update.Invoke();          
     }
 
-    public abstract class InfoUtility
+    public abstract class UtilityBase
     {
         #region fields
 
-        public static bool justStarted;
-        public static Dictionary<long, MyTuple<bool, float>> GraphStorage = new Dictionary<long, MyTuple<bool, float>>();
         protected MyGridProgram Program;
+        protected GraphicsManager GCM;
         protected IMyGridTerminalSystem TerminalSystem;
         protected const char
             cmd = '!',
-            space = ' ',
             bar = 'b',
             pct = '%';
         protected string invalid = "••", name;
         public string Name => name.ToUpper();
-        protected StringBuilder Builder;
-        protected SpriteData jitSprite = new SpriteData(long.MinValue);
-        protected double bad = double.NaN;
-        public static void ApplyBuilder(SpriteData d)
-        {
-            StringBuilder builder = new StringBuilder(d.Data);
-            if (d.Prepend != null)
-                builder.Insert(0, d.Prepend);
-            if (d.Append != null)
-                builder.Append(d.Append);
-            d.Data = builder.ToString();
-        }
+        protected SpriteData jitSprite = new SpriteData();
+        protected const double bad = double.NaN;
         #endregion
 
-        public InfoUtility()
+        public virtual void Reset(GraphicsManager manager, MyGridProgram program)
         {
-            Builder = new StringBuilder();
-        }
-        public virtual void Reset(MyGridProgram program)
-        {
-            GraphStorage.Clear();
+            GCM = manager;
             Program = program;
             TerminalSystem = program.GridTerminalSystem;
-            justStarted = true;
+            jitSprite.uID = long.MinValue;
         }
 
         public abstract void Update();
@@ -98,7 +84,7 @@ namespace IngameScript
     // this is all for the K_DATA field of the sprite.
     // <required param 1>$<required param 2>$...$<required param n>
 
-    public class GasUtilities : InfoUtility
+    public class GasUtilities : UtilityBase
     {
         InventoryUtilities Inventory;
         public List<IMyGasTank>
@@ -119,9 +105,9 @@ namespace IngameScript
         }
 
         #region InfoUtility
-        public override void Reset(MyGridProgram program)
+        public override void Reset(GraphicsManager m, MyGridProgram p)
         {
-            base.Reset(program);
+            base.Reset(m, p);
             hTime.Clear();
             HydrogenTanks.Clear();
             OxygenTanks.Clear();
@@ -144,17 +130,19 @@ namespace IngameScript
                 b.Data = o2.Data.ToString("#0.#%"));
             commands.Add("!h2b", (b) =>
             {
-                if (justStarted) Util.CreateBarGraph(ref b);
-                Util.UpdateBarGraph(ref b, h2.Data);
+                if (GCM.justStarted) 
+                    Lib.CreateBarGraph(ref b);
+                Lib.UpdateBarGraph(ref b, h2.Data);
             });
             commands.Add("!o2b", (b) =>
             {
-                if (justStarted) Util.CreateBarGraph(ref b);
-                Util.UpdateBarGraph(ref b, o2.Data);
+                if (GCM.justStarted) 
+                    Lib.CreateBarGraph(ref b);
+                Lib.UpdateBarGraph(ref b, o2.Data);
             });
             commands.Add("!h2t", (b) =>
             {
-                if (justStarted)
+                if (GCM.justStarted)
                 {
                     if (b.Data == "sec")
                         hTime.Add(b.uID, 1);
@@ -169,7 +157,7 @@ namespace IngameScript
             commands.Add("!ice", (b) =>
             {
                 var rate = 0d;
-                if (justStarted && !Inventory.Items.ContainsKey(Ice.iID))
+                if (GCM.justStarted && !Inventory.Items.ContainsKey(Ice.iID))
                     Inventory.Items.Add(Ice.iID, new ItemInfo(new InventoryItem("Ore", Ice.iID), Inventory));
                 b.Data = Inventory.TryGetUseRate<IMyTerminalBlock>(Ice, out rate) ? (rate / keen).ToString("G4") : invalid;
             });
@@ -280,28 +268,24 @@ namespace IngameScript
         }
     }
 
-    public class ItemInfo : Info
+    public class ItemInfo : IInfo
     {
-        public override double Data => item.Quantity;
+        public double Data => item.Quantity;
         public InventoryItem Item => item;
         public string ID => item.Type.SubtypeId;
         private InventoryItem item;
         private readonly InventoryUtilities Inventory;
 
-        public ItemInfo(InventoryItem i, InventoryUtilities iu) : base(null)
+        public ItemInfo(InventoryItem i, InventoryUtilities iu)
         {
             item = i;
             Inventory = iu;
             Update();
-        }
-
-        public override void Update()
-        {
-            Inventory.GetItem(ref item);
-        }
+        }          
+        public void Update() => Inventory.GetItem(ref item);
     }
 
-    public class InventoryUtilities : InfoUtility
+    public class InventoryUtilities : UtilityBase
     {
 
         public IMyProgrammableBlock Reference;
@@ -515,7 +499,7 @@ namespace IngameScript
         {
             if (key == J)
                 return;
-            Parser p = new Parser();
+            var p = new iniWrap();
             MyIniParseResult result;
             if (p.CustomData(Reference, out result))
                 if (p.hasKey(Section, key))
@@ -556,9 +540,9 @@ namespace IngameScript
         }
 
         #region InfoUtility
-        public override void Reset(MyGridProgram program)
+        public override void Reset(GraphicsManager m, MyGridProgram p)
         {
-            base.Reset(program);
+            base.Reset(m, p);
             InventoryBlocks.Clear();
 
             TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
@@ -582,12 +566,12 @@ namespace IngameScript
         public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
         {
             Items.Clear();
-            var p = new Parser();
+            var p = new iniWrap();
             if (p.CustomData(Reference))
                 ignoreTanks = p.Bool(Section, "ignoreTanks", true);
             commands.Add("!item", (b) =>
             {
-                if (justStarted)
+                if (GCM.justStarted)
                     if (b.Data.Contains(cmd))
                     {
                         b.Data = b.Data.Trim();
@@ -597,20 +581,24 @@ namespace IngameScript
                         if (!Items.ContainsKey(s[1]))
                             Items.Add(s[1], new ItemInfo(new InventoryItem(s[0], s[1]), this));
                     }
-                    else throw new Exception("LOLE");
+                    else return;
                 UpdateItemString(b.uID, ref b.Data);
             });
 
             commands.Add("!itemslist", (b) =>
             {
-                if (justStarted && b.Data != "")
-                { AddItemGroup(b.uID, b.Data); return; }
+                if (GCM.justStarted && b.Data != "")
+                { 
+                    AddItemGroup(b.uID, b.Data); 
+                    return; 
+                }
                 UpdateItemString(b.uID, ref b.Data);
             });
 
             commands.Add("!invdebug", (b) =>
             {
-                if (!justStarted) return;
+                if (!GCM.justStarted) 
+                    return;
                 string debug = $"INVENTORIES - {InventoryBlocks.Count}";
                 var c = 0;
 
@@ -635,12 +623,12 @@ namespace IngameScript
         #endregion
     }
 
-    //public class BlockUtilities : InfoUtility
+    //public class BlockUtilities : UtilityBase
     //{
 
     //}
 
-    public class FlightUtilities : InfoUtility
+    public class FlightUtilities : UtilityBase
     {
         //IMyCubeGrid Ship; //fuvckoff
         IMyShipController Controller;
@@ -651,17 +639,18 @@ namespace IngameScript
         Vector3D VZed = Vector3D.Zero, lastVel, grav;
         Info jump;
 
-        public FlightUtilities(string f)
+        public FlightUtilities(string s)
         {
             name = "Flight";
-            std = f;
+            var p = new iniWrap();
+            std = p.String(s, "flightFormat", "0000");
         }
 
         #region InfoUtility
 
-        public override void Reset(MyGridProgram program)
+        public override void Reset(GraphicsManager m, MyGridProgram p)
         {
-            base.Reset(program);
+            base.Reset(m, p);
             //Ship = program.Me.CubeGrid;
             TerminalSystem.GetBlocksOfType<IMyShipController>(null, (b) =>
             {
@@ -695,8 +684,9 @@ namespace IngameScript
 
             commands.Add("!jchargeb", (b) =>
             {
-                if (justStarted) Util.CreateBarGraph(ref b);
-                Util.UpdateBarGraph(ref b, jump.Data);
+                if (GCM.justStarted) 
+                    Lib.CreateBarGraph(ref b);
+                Lib.UpdateBarGraph(ref b, jump.Data);
             });
 
         }
@@ -708,10 +698,7 @@ namespace IngameScript
 
         #endregion
 
-        string Validate(double v, string f, string o = "••")
-        {
-            return !double.IsNaN(v) ? v.ToString(f) : o;
-        }
+        string Validate(double v, string f, string o = "••") => !double.IsNaN(v) ? v.ToString(f) : o;
 
         bool GravCheck(out Vector3D grav) //wanted something nice and neat
         {
@@ -754,7 +741,7 @@ namespace IngameScript
             var ts = DateTime.Now;
 
             var current = Controller.GetShipVelocities().LinearVelocity;
-            if (!justStarted)
+            if (!GCM.justStarted)
             {
                 if (!Controller.DampenersOverride || current.Length() < 0.037) return bad;
                 var mag = (lastVel - current).Length();
@@ -785,7 +772,7 @@ namespace IngameScript
         }
     }
 
-    public class PowerUtilities : InfoUtility
+    public class PowerUtilities : UtilityBase
     {
         InventoryUtilities Inventory;
         List<IMyBatteryBlock> Batteries = new List<IMyBatteryBlock>();
@@ -795,22 +782,22 @@ namespace IngameScript
         UseRate U;
         Info batt;
         string I = "ON", O = "OFF";
-        public PowerUtilities(InventoryUtilities inventory)
+        public PowerUtilities(ref InventoryUtilities inventory)
         {
             Inventory = inventory;
             name = "Power";
             U = new UseRate("Uranium");
         }
         #region InfoUtility
-        public override void Reset(MyGridProgram program)
+        public override void Reset(GraphicsManager m, MyGridProgram p)
         {
-            base.Reset(program);
+            base.Reset(m, p);
             Batteries.Clear();
             Reactors.Clear();
             Engines.Clear();
-            TerminalSystem.GetBlocksOfType(Batteries, (battery) => battery.IsSameConstructAs(program.Me));
-            TerminalSystem.GetBlocksOfType(Reactors, (reactor) => reactor.IsSameConstructAs(program.Me));
-            TerminalSystem.GetBlocksOfType(Engines, (generator) => generator.IsSameConstructAs(program.Me) && generator.CustomName.Contains("Engine"));
+            TerminalSystem.GetBlocksOfType(Batteries, (battery) => battery.IsSameConstructAs(p.Me));
+            TerminalSystem.GetBlocksOfType(Reactors, (reactor) => reactor.IsSameConstructAs(p.Me));
+            TerminalSystem.GetBlocksOfType(Engines, (generator) => generator.IsSameConstructAs(p.Me) && generator.CustomName.Contains("Engine"));
         }
 
         public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
@@ -824,14 +811,15 @@ namespace IngameScript
 
             commands.Add("!bchargeb", (b) =>
             {
-                if (justStarted) Util.CreateBarGraph(ref b);
-                Util.UpdateBarGraph(ref b, batt.Data);
+                if (GCM.justStarted) 
+                    Lib.CreateBarGraph(ref b);
+                Lib.UpdateBarGraph(ref b, batt.Data);
             });
 
             commands.Add("!fission", (b) =>
             {
                 var rate = 0d;
-                if (justStarted)
+                if (GCM.justStarted)
                     if (!Inventory.Items.ContainsKey(U.iID))
                         Inventory.Items.Add(U.iID, new ItemInfo(new InventoryItem("Ingot", U.iID), Inventory));
                 b.Data = Inventory.TryGetUseRate(U, out rate, Reactors) ? $"{rate:000.0} KG/S" : "0 KG/S";
@@ -855,10 +843,7 @@ namespace IngameScript
             });
         }
 
-        public override void Update()
-        {
-            batt.Update();
-        }
+        public override void Update() => batt.Update();
 
         #endregion
         double BatteryCharge()
@@ -878,7 +863,7 @@ namespace IngameScript
     }
 
     // TODO: THIS SYSTEM IS ASS
-    public class WeaponUtilities : InfoUtility
+    public class WeaponUtilities : UtilityBase
     {
         Dictionary<long, MyTuple<string, IMyTerminalBlock[]>> WeaponGroups = new Dictionary<long, MyTuple<string, IMyTerminalBlock[]>>();
         WCPBAPI api = null;
@@ -902,9 +887,9 @@ namespace IngameScript
         }
 
         #region InfoUtility
-        public override void Reset(MyGridProgram program)
+        public override void Reset(GraphicsManager m, MyGridProgram p)
         {
-            base.Reset(program);
+            base.Reset(m, p);
             WCPBAPI.Activate(Program.Me, ref api);
             WeaponGroups.Clear();
         }

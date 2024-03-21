@@ -11,7 +11,7 @@ using VRage.Game.GUI.TextPanel;
 
 namespace IngameScript
 {
-    public class Parser : IDisposable
+    public class iniWrap: IDisposable
     {
         static List<MyIni> IniParsers = new List<MyIni>();
         static int IniCount = 0;
@@ -19,7 +19,7 @@ namespace IngameScript
         string tld = "~";
         MyIniParseResult result;
 
-        public Parser()
+        public iniWrap()
         {
             ++IniCount;
             if (IniParsers.Count < IniCount)
@@ -137,7 +137,7 @@ namespace IngameScript
             byte r, g, b, a;
             def = myIni.Get(aSct, aKy).ToString(def).ToLower();
             if (def.Length != 8) 
-                return Util.dColor; //safety
+                return Lib.dColor; //safety
             r = Hex(def, 0, 2);
             g = Hex(def, 2, 2);
             b = Hex(def, 4, 2);

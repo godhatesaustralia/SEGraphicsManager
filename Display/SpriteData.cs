@@ -3,6 +3,7 @@ using System;
 using System.Runtime.Remoting.Messaging;
 using System.Security.Policy;
 using VRage.Game.GUI.TextPanel;
+using VRage.Library.Utils;
 using VRageMath;
 
 namespace IngameScript
@@ -13,68 +14,68 @@ namespace IngameScript
 
         public SpriteType Type;
         public TextAlignment Alignment;
-        public Action<SpriteData> Command;
+        public Action<SpriteData> Command = null;
         public Priority Priority;
         public long uID = -1; // this field is only set if sprite is using a command.
         public float
-            SizeX,
-            SizeY,
-            PosX,
-            PosY,
-            RorS,
-            Length;
+            sX,
+            sY,
+            X,
+            Y,
+            RorS;
         public string
             Name,
             Data,
             FontID = "White",
-            CommandString,
+            commandID,
             Prepend,
             Append;
         public Color Color;
 
         public SpriteData[] Children;
 
-        public bool
-            Builder; //for commands, whether to apply stringbuilder (and to attempt parse of stringbuilder param)
+        public bool Builder { get; private set; }
+
         public MySprite sprCached;
 
         #endregion
 
         public SpriteData()
         {
-            Type = Util.dType;
-            Priority = Priority.None;
-            Command = null;
+        }
+
+        public SpriteData(Color color, string name = "", string data = "", float posX = 0, float posY = 0, float ros = float.MinValue,  float szX = 0, float szY = 0, string font = "White", Priority p = Priority.None, SpriteType type = SpriteType.TEXT, TextAlignment align = TextAlignment.CENTER, string command = "", string prepend = "", string append = "")
+        {
             uID = -1;
-            RorS = 1;
-            Color = Util.dColor;
-            Builder = false;
-            Prepend = Append = "";
-        }
-
-        public SpriteData(long i) : base()
-        {
-            uID = i;
-        }
-
-        public SpriteData(SpriteType type, string name, string data, float sizeX, float sizeY, TextAlignment align, float posX, float posY, float ros, Color color, string font = "White", Priority p = Priority.None, string command = "", bool builder = false, string prepend = "", string append = "")
-        {
+            Color = color;
             Type = type;
             Name = name;    
             Data = data;
-            SizeX = sizeX;
-            SizeY = sizeY;
+            if (Type != Lib.dType)
+            {
+                sX = szX;
+                sY = szY;
+            }
             Alignment = align;
-            PosX = posX;
-            PosY = posY;
-            RorS = ros;
-            Color = color;
-            FontID = font;
+            X = posX;
+            Y = posY;
+            if (RorS == float.MinValue)
+                RorS = Type == Lib.dType ? 1 : 0; 
+            else RorS = ros;
             Priority = p; //NONE = 0,  high (every 10) = 1, low = 2
-            CommandString = command;
-            Builder = builder;
-            Prepend = prepend;
-            Append = append;
+            commandID = command;
+            if (Type == Lib.dType)
+            {
+                FontID = font;
+                Prepend = prepend;
+                Append = append;
+                setSB();
+            }
+        }
+
+        public void setSB()
+        {
+            Builder = (Prepend != "" || Append != "");
         }
 
         public static MySprite createSprite(SpriteData d, bool start = false)
@@ -83,10 +84,10 @@ namespace IngameScript
                 return d.sprCached;
             else
             {
-                var sprite = d.Type == Util.dType ? new MySprite(
+                var sprite = d.Type == Lib.dType ? new MySprite(
                 d.Type,
                 d.Data,
-                new Vector2(d.PosX, d.PosY),
+                new Vector2(d.X, d.Y),
                 null,
                 d.Color,
                 d.FontID,
@@ -96,8 +97,8 @@ namespace IngameScript
                 : new MySprite(
                 d.Type,
                 d.Data,
-                new Vector2(d.PosX, d.PosY),
-                new Vector2(d.SizeX, d.SizeY),
+                new Vector2(d.X, d.Y),
+                new Vector2(d.sX, d.sY),
                 d.Color,
                 null,
                 d.Alignment,

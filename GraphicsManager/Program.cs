@@ -5,7 +5,6 @@ namespace IngameScript
     {
         public GraphicsManager Manager;
         string tag = "GCM";
-        string format = "0000";
         public Program()
         {
             Manager = new GraphicsManager(this, tag);
@@ -14,10 +13,10 @@ namespace IngameScript
             Manager.Keys = new IniKeys();
             
             Manager.Inventory = new InventoryUtilities(this, tag);
-            Manager.InfoUtilities.Add(new FlightUtilities(format));
-            Manager.InfoUtilities.Add(new GasUtilities(ref Manager.Inventory));
-            Manager.InfoUtilities.Add(new PowerUtilities(Manager.Inventory));
-            Manager.InfoUtilities.Add(new WeaponUtilities(Manager.Tag));
+            Manager.Utilities.Add(new FlightUtilities(tag));
+            Manager.Utilities.Add(new GasUtilities(ref Manager.Inventory));
+            Manager.Utilities.Add(new PowerUtilities(ref Manager.Inventory));
+            Manager.Utilities.Add(new WeaponUtilities(Manager.Tag));
             Manager.Init();
         }
 

@@ -15,24 +15,26 @@ namespace IngameScript
         public MyGridProgram Program;
         public IMyGridTerminalSystem Terminal;
         public IMyProgrammableBlock Me;
-        public long
-        Frame,
-        WorstFrame;
-        public double RuntimeMS, WorstRun, AverageRun;
+
         public string Tag, GCM, Name;
+
         Dictionary<string, Action<SpriteData>> Commands;
         List<DisplayBase> Displays, FastDisplays, Static;
-        public List<InfoUtility> InfoUtilities;
+
+        public List<UtilityBase> Utilities;
         public InventoryUtilities Inventory;
+
         public List<IMyTerminalBlock> Blocks = new List<IMyTerminalBlock>();
         HashSet<IMyTerminalBlock> DisplayBlocks = new HashSet<IMyTerminalBlock>();
   
         public IniKeys Keys;
-        StringBuilder Builder;
-        int dPtr, iPtr, // display pointers
+        public bool justStarted => !setupComplete;
+
+        private int dPtr, iPtr, // display pointers
             min = 96, fast; // min - frames to wait for echo, fast - determines Priority.Fast
-        double totalRt;
-        bool frozen = false, setupComplete, draw;
+        private double totalRt, RuntimeMS, WorstRun, AverageRun;
+        private bool frozen = false, setupComplete, draw;
+        private long Frame, WorstFrame;
         #endregion
 
         public GraphicsManager(MyGridProgram program, string t)
@@ -44,9 +46,8 @@ namespace IngameScript
             Commands = new Dictionary<string, Action<SpriteData>>();
             Displays = new List<DisplayBase>();
             Static = new List<DisplayBase>();
-            InfoUtilities = new List<InfoUtility>();
-            Builder = new StringBuilder();
-            var p = new Parser();
+            Utilities = new List<UtilityBase>();
+            var p = new iniWrap();
             var result = new MyIniParseResult();
             if (p.CustomData(Me, out result))
             {
@@ -66,6 +67,7 @@ namespace IngameScript
             Displays.Clear();
             Blocks.Clear();
             DisplayBlocks.Clear();
+            Lib.GraphStorage.Clear();
         }
 
         public void Init(bool auto = true)
@@ -79,19 +81,19 @@ namespace IngameScript
                 Frame = WorstFrame = 0;
                 RuntimeMS = WorstRun = AverageRun = totalRt = 0;
                 Inventory.Setup(ref Commands);
-                foreach (InfoUtility utility in InfoUtilities)
+                foreach (UtilityBase utility in Utilities)
                     utility.Setup(ref Commands);
             }
-            Inventory.Reset(Program);
-            foreach (InfoUtility utility in InfoUtilities)
-                utility.Reset(Program);
+            Inventory.Reset(this, Program);
+            foreach (UtilityBase utility in Utilities)
+                utility.Reset(this, Program);
 
             if (useCustomDisplays)
                 GetDisplays();
 
             RunSetup();
 
-            if (auto && DisplayBlocks.Count <= 5)
+            if (auto && DisplayBlocks.Count <= 6)
                 while (DisplayBlocks.Count > 0)
                     RunSetup();
         }
@@ -105,11 +107,8 @@ namespace IngameScript
 
         private void RunSetup()
         {
-            if (DisplayBlocks == null || DisplayBlocks.Count == 0)
-            {
-                setupComplete = true; 
-                InfoUtility.justStarted = false;
-            }
+            if (DisplayBlocks.Count == 0)
+                setupComplete = true;
             else
             {
                 var b = DisplayBlocks.First();
@@ -175,7 +174,7 @@ namespace IngameScript
                             }
                             else
                             {
-                                Program.Runtime.UpdateFrequency = Util.uDef;
+                                Program.Runtime.UpdateFrequency = Lib.uDef;
                                 frozen = true;
                                 break;
                             }
@@ -191,7 +190,7 @@ namespace IngameScript
                             Wipe(ref Displays);
                             Wipe(ref Static);
                             Program.Echo("All displays wiped, ready to restart.");
-                            Program.Runtime.UpdateFrequency = Util.uDef;
+                            Program.Runtime.UpdateFrequency = Lib.uDef;
                             return;
                         }
                     default: { break; }
@@ -203,7 +202,7 @@ namespace IngameScript
                     d.Update(ref p);
             if (draw)
             {
-                Displays[Util.Next(ref dPtr, Displays.Count)].Update(ref p);
+                Displays[Lib.Next(ref dPtr, Displays.Count)].Update(ref p);
                 if (dPtr == 0)
                 {
                     Inventory.needsUpdate = true;
@@ -214,7 +213,7 @@ namespace IngameScript
                 Inventory.Update();
             else
             {
-                InfoUtilities[Util.Next(ref iPtr, InfoUtilities.Count)].Update();
+                Utilities[Lib.Next(ref iPtr, Utilities.Count)].Update();
                 draw = iPtr == 0;
             }
             var rt = Program.Runtime.LastRunTimeMs;
@@ -231,7 +230,7 @@ namespace IngameScript
                 if (draw) r += $"DRAWING DISPLAY {dPtr + 1}/{Displays.Count}";
                 else if (Inventory.needsUpdate)
                     r += $"INV {Inventory.Pointer}/{Inventory.Items.Count}";
-                else r += $"UTILS {iPtr + 1}/{InfoUtilities.Count} - {InfoUtilities[iPtr].Name}";
+                else r += $"UTILS {iPtr + 1}/{Utilities.Count} - {Utilities[iPtr].Name}";
 
                 r += $"\nRUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun.ToString("0.####")} ms\nWORST - {WorstRun} ms, F{WorstFrame}\n";
                 Program.Echo(r);

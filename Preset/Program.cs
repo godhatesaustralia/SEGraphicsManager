@@ -26,15 +26,16 @@ namespace IngameScript
 
         public Program()
         {
+            string s = "GCM";
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
-            Manager = new GraphicsManager(this);
+            Manager = new GraphicsManager(this, s);
             // NO TOUCH DISPLAY ;)
             Manager.useCustomDisplays = false;
             Manager.Keys = new IniKeys();
-
-            Manager.InfoUtilities.Add(new GasUtilities());
-            Manager.InfoUtilities.Add(new InventoryUtilities());
-            Manager.InfoUtilities.Add(new FlightUtilities());
+            Manager.Inventory = new InventoryUtilities(this, s);
+            Manager.Utilities.Add(new GasUtilities(ref Manager.Inventory));
+            Manager.Utilities.Add(new FlightUtilities(s));
+            Manager.Utilities.Add(new PowerUtilities(ref Manager.Inventory));
             Manager.Init();
         }
         public void Main(string argument, UpdateType updateSource)
