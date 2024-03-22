@@ -2,6 +2,7 @@
 using System;
 using System.Runtime.Remoting.Messaging;
 using System.Security.Policy;
+using System.Text;
 using VRage.Game.GUI.TextPanel;
 using VRage.Library.Utils;
 using VRageMath;
@@ -30,6 +31,7 @@ namespace IngameScript
             commandID,
             Prepend,
             Append;
+        private string[] itemTags;
         public Color Color;
 
         public SpriteData[] Children;
@@ -73,10 +75,7 @@ namespace IngameScript
             }
         }
 
-        public void setSB()
-        {
-            Builder = (Prepend != "" || Append != "");
-        }
+        public void setSB() => Builder = (Prepend != "" || Append != "");          
 
         public static MySprite createSprite(SpriteData d, bool start = false)
         {

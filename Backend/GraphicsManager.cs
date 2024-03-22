@@ -68,6 +68,7 @@ namespace IngameScript
             Blocks.Clear();
             DisplayBlocks.Clear();
             Lib.GraphStorage.Clear();
+            Lib.lights.Clear();
         }
 
         public void Init(bool auto = true)
@@ -84,6 +85,7 @@ namespace IngameScript
                 foreach (UtilityBase utility in Utilities)
                     utility.Setup(ref Commands);
             }
+            //Lib.lockdown(this);
             Inventory.Reset(this, Program);
             foreach (UtilityBase utility in Utilities)
                 utility.Reset(this, Program);
@@ -192,6 +194,11 @@ namespace IngameScript
                             Program.Echo("All displays wiped, ready to restart.");
                             Program.Runtime.UpdateFrequency = Lib.uDef;
                             return;
+                        }
+                    case "bm":
+                        {
+                            //Lib.lockdown(this);
+                            break;
                         }
                     default: { break; }
                 }

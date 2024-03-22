@@ -202,7 +202,7 @@ namespace IngameScript
         private void Default(ref IMyTextSurface s)
         { 
             var c = (s.TextureSize - s.SurfaceSize) / 2;
-            var d = new SpriteData(Color.White, Name, "", c.X, c.Y, 0.4375f);
+            var d = new SpriteData(Color.White, Name, "", c.X + (c.X * 0.4f), c.Y + (c.Y * 0.4f), 0.4375f);
             s.ScriptBackgroundColor = Color.Blue;
             d.Data = $"{Name}\nSURFACE {s.Name}\nSCREEN SIZE {s.SurfaceSize}\nTEXTURE SIZE {s.TextureSize}\n\n\n{Lib.bsod}";
             d.FontID = "Monospace";

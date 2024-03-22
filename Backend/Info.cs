@@ -46,7 +46,7 @@ namespace IngameScript
         {
             update = u;
         }
-        public void Update() => data = update.Invoke();          
+        public void Update() => data = update.Invoke();
     }
 
     public abstract class UtilityBase
@@ -100,7 +100,7 @@ namespace IngameScript
         public GasUtilities(ref InventoryUtilities inv)
         {
             name = "Gas";
-            Ice = new UseRate("Ice");
+            Ice = new UseRate("Ore!Ice");
             Inventory = inv;
         }
 
@@ -130,13 +130,13 @@ namespace IngameScript
                 b.Data = o2.Data.ToString("#0.#%"));
             commands.Add("!h2b", (b) =>
             {
-                if (GCM.justStarted) 
+                if (GCM.justStarted)
                     Lib.CreateBarGraph(ref b);
                 Lib.UpdateBarGraph(ref b, h2.Data);
             });
             commands.Add("!o2b", (b) =>
             {
-                if (GCM.justStarted) 
+                if (GCM.justStarted)
                     Lib.CreateBarGraph(ref b);
                 Lib.UpdateBarGraph(ref b, o2.Data);
             });
@@ -158,7 +158,10 @@ namespace IngameScript
             {
                 var rate = 0d;
                 if (GCM.justStarted && !Inventory.Items.ContainsKey(Ice.iID))
-                    Inventory.Items.Add(Ice.iID, new ItemInfo(new InventoryItem("Ore", Ice.iID), Inventory));
+                {
+                    var i = Ice.iID.Split(cmd);
+                    Inventory.Items.Add(Ice.iID, new ItemInfo(i[0], i[1], Inventory));
+                }
                 b.Data = Inventory.TryGetUseRate<IMyTerminalBlock>(Ice, out rate) ? (rate / keen).ToString("G4") : invalid;
             });
         }
@@ -220,7 +223,6 @@ namespace IngameScript
         public string Tag = "";
         public MyItemType Type;
         public int Quantity = 0;
-        public long last = 0;
         public InventoryItem(string[] line)
         {
             if (line.Length != 3) return;
@@ -231,12 +233,12 @@ namespace IngameScript
         {
             Type = new MyItemType(InventoryUtilities.myObjectBuilder + '_' + t, st);
         }
-
-        public override string ToString()
-        {
-            if (!string.IsNullOrEmpty(Tag)) return $"{Tag} {Quantity}";
-            else return Quantity.ToString();
-        }
+        //{
+        //    if (!string.IsNullOrEmpty(Tag)) 
+        //        return $"{Tag} {Quantity}";
+        //    else 
+        //        return 
+        //}
     }
 
     public class UseRate
@@ -270,19 +272,25 @@ namespace IngameScript
 
     public class ItemInfo : IInfo
     {
-        public double Data => item.Quantity;
-        public InventoryItem Item => item;
-        public string ID => item.Type.SubtypeId;
-        private InventoryItem item;
+        public double Data => quantity;
+        private double quantity;
+        public readonly MyItemType Type;
+
+        public string ID => Tag + '!' + Type.SubtypeId;
+        public readonly string Tag;
         private readonly InventoryUtilities Inventory;
 
-        public ItemInfo(InventoryItem i, InventoryUtilities iu)
+        public ItemInfo(string t, string st, InventoryUtilities iu)
         {
-            item = i;
             Inventory = iu;
+            Tag = t;
+            Type = new MyItemType(InventoryUtilities.myObjectBuilder + '_' + t, st);
             Update();
-        }          
-        public void Update() => Inventory.GetItem(ref item);
+        }
+
+        public void Update() => quantity = Inventory.ItemQuantity(ref Inventory.InventoryBlocks, this);
+
+        public override string ToString() => quantity.ToString();
     }
 
     public class InventoryUtilities : UtilityBase
@@ -295,7 +303,9 @@ namespace IngameScript
         bool ignoreTanks;
         public bool needsUpdate;
         public List<IMyTerminalBlock> InventoryBlocks = new List<IMyTerminalBlock>();
-        Dictionary<long, string[]> itemKeys = new Dictionary<long, string[]>();
+        private Dictionary<long, string[]>
+            itemKeys = new Dictionary<long, string[]>(),
+            itemTags = new Dictionary<long, string[]>();
         // you know i had to do it to em
         public SortedList<string, ItemInfo> Items = new SortedList<string, ItemInfo>();
         public int Pointer => iiPtr + 1;
@@ -463,7 +473,7 @@ namespace IngameScript
         //      MyObjectBuilder_PhysicalGunObject/WelderItem
         #endregion
 
-        private int ItemQuantity<T>(ref List<T> blocks, InventoryItem item)
+        public int ItemQuantity<T>(ref List<T> blocks, ItemInfo item)
             where T : IMyTerminalBlock
         {
             int amt = 0;
@@ -479,17 +489,12 @@ namespace IngameScript
             return amt;
         }
 
-        public void GetItem(ref InventoryItem item)
-        {
-            item.Quantity = ItemQuantity(ref InventoryBlocks, item);
-        }
-
         public bool TryGetUseRate<T>(UseRate r, out double rate, List<T> invs = null)
             where T : IMyTerminalBlock
         {
             rate = 0;
             if (r.iID == J) return false;
-            int q = invs == null ? ItemQuantity(ref InventoryBlocks, Items[r.iID].Item) : ItemQuantity(ref invs, Items[r.iID].Item);
+            int q = invs == null ? ItemQuantity(ref InventoryBlocks, Items[r.iID]) : ItemQuantity(ref invs, Items[r.iID]);
             rate = r.Rate(q);
             if (rate <= 0) return false;
             return true;
@@ -508,18 +513,29 @@ namespace IngameScript
                     if (s.Length > 0)
                     {
                         var k = new string[s.Length];
+                        var t = new string[s.Length];
                         for (int i = 0; i < s.Length; i++)
                         {
                             var a = s[i].Split(cmd);
-                            if (!Items.ContainsKey(a[2]))
+                            if (!Items.ContainsKey(a[1] + cmd + a[2]))
                                 try
-                                { Items.Add(a[2], new ItemInfo(new InventoryItem(a), this)); }
+                                {
+                                    var item = new ItemInfo(a[1], a[2], this);
+                                    Items.Add(item.ID, item);
+                                }
                                 catch (Exception e)
                                 { continue; }
-                            k[i] = a[2];
+                            k[i] = a[1] + cmd + a[2];
+                            if (a.Length != 3)
+                                t[i] = "";
+                            else
+                                t[i] = a[0] + " ";
                         }
                         if (!itemKeys.ContainsKey(id))
+                        {
                             itemKeys.Add(id, k);
+                            itemTags.Add(id, t);
+                        }
                     }
                     return;
                 }
@@ -529,17 +545,20 @@ namespace IngameScript
 
         void UpdateItemString(long id, ref string data)
         {
-            var v = "";
-            if (!itemKeys.ContainsKey(id)) return;
-            data = Items[itemKeys[id][0]].Item.ToString();
-            if (itemKeys[id].Length == 1) return;
-
+            if (!itemKeys.ContainsKey(id))
+                return;
+            //string s = "";
+            //foreach (var key in Items.Keys) s += $"\n{key}";
+            //throw new Exception(s);
+            data = itemTags[id][0] + Items[itemKeys[id][0]].ToString();
+            if (itemKeys[id].Length == 1)
+                return;
             for (int i = 1; i < itemKeys[id].Length; i++)
-                data += $"\n{Items[itemKeys[id][i]].Item}";
-
+                data += $"\n{itemTags[id][i]}{Items[itemKeys[id][i]]}";
         }
 
         #region InfoUtility
+
         public override void Reset(GraphicsManager m, MyGridProgram p)
         {
             base.Reset(m, p);
@@ -549,11 +568,12 @@ namespace IngameScript
             {
                 var i = b.HasInventory && b.IsSameConstructAs(Reference);
                 if (ignoreTanks)
-                    if (b is IMyGasTank) return false;
+                    if (b is IMyGasTank)
+                        return false;
                 if (i) InventoryBlocks.Add(b);
                 return i;
             });
-            var jitItem = new ItemInfo(new InventoryItem("Ingot", J), this);
+            var jitItem = new ItemInfo("Ingot", J, this);
             var temp = new Queue<double>();
             var d = 0d;
             AddItemGroup(jitSprite.uID, J);
@@ -561,6 +581,7 @@ namespace IngameScript
             TryGetUseRate<IMyTerminalBlock>(new UseRate(J), out d);
             Items.Remove(J);
             itemKeys.Remove(jitSprite.uID);
+            itemTags.Remove(jitSprite.uID);
         }
 
         public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
@@ -577,9 +598,12 @@ namespace IngameScript
                         b.Data = b.Data.Trim();
                         var s = b.Data.Split(cmd);
                         if (!itemKeys.ContainsKey(b.uID))
-                            itemKeys.Add(b.uID, new string[] { s[1] });
-                        if (!Items.ContainsKey(s[1]))
-                            Items.Add(s[1], new ItemInfo(new InventoryItem(s[0], s[1]), this));
+                        {
+                            itemKeys.Add(b.uID, new string[] { b.Data });
+                            itemTags.Add(b.uID, new string[] { "" });
+                        }
+                        if (!Items.ContainsKey(b.Data))
+                            Items.Add(b.Data, new ItemInfo(s[0], s[1], this));
                     }
                     else return;
                 UpdateItemString(b.uID, ref b.Data);
@@ -588,19 +612,18 @@ namespace IngameScript
             commands.Add("!itemslist", (b) =>
             {
                 if (GCM.justStarted && b.Data != "")
-                { 
-                    AddItemGroup(b.uID, b.Data); 
-                    return; 
+                {
+                    AddItemGroup(b.uID, b.Data);
+                    return;
                 }
                 UpdateItemString(b.uID, ref b.Data);
             });
 
             commands.Add("!invdebug", (b) =>
             {
-                if (!GCM.justStarted) 
+                if (!GCM.justStarted)
                     return;
                 string debug = $"INVENTORIES - {InventoryBlocks.Count}";
-                var c = 0;
 
                 foreach (var item in Items.Keys)
                     debug += $"\n{item.ToUpper()}";
@@ -634,16 +657,18 @@ namespace IngameScript
         IMyShipController Controller;
         List<IMyJumpDrive> JumpDrives = new List<IMyJumpDrive>();
         double lastDist, maxDist;
+        readonly string tag, ctrl, fmat;
         string std;
         DateTime stopTS; // fuck you
         Vector3D VZed = Vector3D.Zero, lastVel, grav;
         Info jump;
 
-        public FlightUtilities(string s)
+        public FlightUtilities(string s, string f = "flightFMAT", string c = "shipCTRL")
         {
             name = "Flight";
-            var p = new iniWrap();
-            std = p.String(s, "flightFormat", "0000");
+            tag = s;
+            fmat = f;
+            ctrl = c;
         }
 
         #region InfoUtility
@@ -651,10 +676,13 @@ namespace IngameScript
         public override void Reset(GraphicsManager m, MyGridProgram p)
         {
             base.Reset(m, p);
+            var par = new iniWrap();
+            std = par.String(tag, fmat, "0000");
+            var s = par.String(tag, ctrl, "[I]");
             //Ship = program.Me.CubeGrid;
             TerminalSystem.GetBlocksOfType<IMyShipController>(null, (b) =>
             {
-                if ((b.CustomName.Contains("[I]") || b.IsMainCockpit) && b.IsSameConstructAs(Program.Me))
+                if ((b.CustomName.Contains(s) || b.IsMainCockpit) && b.IsSameConstructAs(Program.Me))
                     Controller = b;
                 return true;
             });
@@ -684,7 +712,7 @@ namespace IngameScript
 
             commands.Add("!jchargeb", (b) =>
             {
-                if (GCM.justStarted) 
+                if (GCM.justStarted)
                     Lib.CreateBarGraph(ref b);
                 Lib.UpdateBarGraph(ref b, jump.Data);
             });
@@ -781,12 +809,12 @@ namespace IngameScript
 
         UseRate U;
         Info batt;
-        string I = "ON", O = "OFF";
+        readonly string I = "ON", O = "OFF";
         public PowerUtilities(ref InventoryUtilities inventory)
         {
             Inventory = inventory;
             name = "Power";
-            U = new UseRate("Uranium");
+            U = new UseRate("Ingot!Uranium");
         }
         #region InfoUtility
         public override void Reset(GraphicsManager m, MyGridProgram p)
@@ -811,7 +839,7 @@ namespace IngameScript
 
             commands.Add("!bchargeb", (b) =>
             {
-                if (GCM.justStarted) 
+                if (GCM.justStarted)
                     Lib.CreateBarGraph(ref b);
                 Lib.UpdateBarGraph(ref b, batt.Data);
             });
@@ -821,7 +849,7 @@ namespace IngameScript
                 var rate = 0d;
                 if (GCM.justStarted)
                     if (!Inventory.Items.ContainsKey(U.iID))
-                        Inventory.Items.Add(U.iID, new ItemInfo(new InventoryItem("Ingot", U.iID), Inventory));
+                        Inventory.Items.Add(U.iID, new ItemInfo("Ingot", U.iID, Inventory));
                 b.Data = Inventory.TryGetUseRate(U, out rate, Reactors) ? $"{rate:000.0} KG/S" : "0 KG/S";
             });
 
@@ -931,11 +959,10 @@ namespace IngameScript
                 }
             });
         }
-        public override void Update()
-        {
-        }
-        #endregion
 
+        public override void Update() { }
+
+        #endregion
         void AddWeaponGroup(SpriteData d)
         {
             var list = new List<IMyTerminalBlock>();

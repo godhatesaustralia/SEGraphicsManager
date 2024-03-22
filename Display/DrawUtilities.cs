@@ -33,6 +33,7 @@ namespace IngameScript
     public static class Lib
     {
         static public Dictionary<long, MyTuple<bool, float>> GraphStorage = new Dictionary<long, MyTuple<bool, float>>();
+        static public List<Color> lights = new List<Color>();
         static public SpriteType dType = SpriteType.TEXT;
         static public UpdateFrequency uDef = UpdateFrequency.None;
         static public Color dColor = Color.HotPink;
@@ -66,6 +67,25 @@ namespace IngameScript
             builder.Append(d.Append);
             d.Data = builder.ToString();
         }
+
+        //internal static void lockdown(GraphicsManager g)
+        //{
+        //    var b = new List<IMyTerminalBlock>();
+        //    g.Terminal.GetBlockGroupWithName("XCT CIC Lights").GetBlocks(b);
+        //    for (int i = 0; i < b.Count; i++)
+        //    {
+        //        if (g.justStarted)
+        //        {
+        //            lights.Add(new Color(90, 150, 90));
+        //            continue;
+        //        }
+        //        var c = b[i] as IMyLightingBlock;
+        //        var cl = c.Color;
+        //        c.Color = lights[i];
+        //        lights[i] = cl;
+        //    }
+
+        //}
 
         public static string EncodeSprites(ref LinkedDisplay display)
         // the idea: have this make the requisite SpriteData constructors here bc im too lazy
