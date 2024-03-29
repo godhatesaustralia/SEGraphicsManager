@@ -21,7 +21,7 @@ using VRageMath;
 namespace IngameScript
 {
     [Flags]
-    public enum Priority : byte
+    public enum Priority
     {
         None,
         Normal,

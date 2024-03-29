@@ -68,25 +68,6 @@ namespace IngameScript
             d.Data = builder.ToString();
         }
 
-        //internal static void lockdown(GraphicsManager g)
-        //{
-        //    var b = new List<IMyTerminalBlock>();
-        //    g.Terminal.GetBlockGroupWithName("XCT CIC Lights").GetBlocks(b);
-        //    for (int i = 0; i < b.Count; i++)
-        //    {
-        //        if (g.justStarted)
-        //        {
-        //            lights.Add(new Color(90, 150, 90));
-        //            continue;
-        //        }
-        //        var c = b[i] as IMyLightingBlock;
-        //        var cl = c.Color;
-        //        c.Color = lights[i];
-        //        lights[i] = cl;
-        //    }
-
-        //}
-
         public static string EncodeSprites(ref LinkedDisplay display)
         // the idea: have this make the requisite SpriteData constructors here bc im too lazy
         // the constructor in question:

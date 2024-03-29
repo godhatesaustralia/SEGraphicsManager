@@ -1,6 +1,10 @@
-﻿using System;
+﻿
+using Sandbox.ModAPI.Ingame;
+using System;
 using System.Collections.Generic;
 using System.Text;
+using VRage.Game.GUI.TextPanel;
+using VRageMath;
 
 namespace IngameScript
 {
@@ -26,11 +30,11 @@ namespace IngameScript
         {
             this.drawingSurface = drawingSurface;
             var viewport = new RectangleF((drawingSurface.TextureSize - drawingSurface.SurfaceSize) / 2f, drawingSurface.SurfaceSize);
-            this.yOffset = viewport.Center.Y / 2;
+            yOffset = viewport.Center.Y / 2;
 
-            this.logoPieces = new List<SpriteGroup> {
+                logoPieces = new List<SpriteGroup> {
                     new SpriteGroup(
-                        new List<MySprite> { Sprite("SquareHollow", viewport.Center, new Vector2(512, 512), 0),
+                        new List<MySprite> {
                             Sprite("SquareSimple", new Vector2(245.07f, 51.47f), new Vector2(72.13f, 56.27f), 0.192f),  //Body-1
                         }
                     ),
@@ -250,7 +254,6 @@ namespace IngameScript
             lastStartStep = 0;
             ticks = 0;
             animate = true;
-
             if (!reverse && !alphaDict.ContainsKey(0))
             {
                 alphaDict.Add(0, 0);
@@ -270,6 +273,9 @@ namespace IngameScript
         private void Animate()
         {
             var frame = drawingSurface.DrawFrame();
+            var v = new Vector2(256, 256);
+            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareHollow", v, 2 * v, Color.White, null, TextAlignment.CENTER));
+
             for (int i = 0; i <= groupIndex; i++)
             {
                 var spriteGroup = logoPieces[i];
@@ -345,6 +351,3 @@ namespace IngameScript
         }
     }
 }
-}
-}
-

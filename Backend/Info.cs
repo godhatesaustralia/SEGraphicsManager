@@ -895,22 +895,9 @@ namespace IngameScript
     {
         Dictionary<long, MyTuple<string, IMyTerminalBlock[]>> WeaponGroups = new Dictionary<long, MyTuple<string, IMyTerminalBlock[]>>();
         WCPBAPI api = null;
-        string tag;
-        int runs = 0, ok = 79;
-        bool hasWC = true;
-        bool wait
-        {
-            get
-            {
-                WCPBAPI.Activate(Program.Me, ref api);
-                runs++;
-                return runs <= ok;
-            }
-        }
 
-        public WeaponUtilities(string t)
+        public WeaponUtilities()
         {
-            tag = t;
             name = "Weapons";
         }
 
@@ -921,27 +908,21 @@ namespace IngameScript
             WCPBAPI.Activate(Program.Me, ref api);
             WeaponGroups.Clear();
         }
-        bool noWC(ref SpriteData b)
-        {
-            var r = !hasWC || api == null;
-            if (r) b.Data = "ERROR";
-            return r;
-        }
+
         public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
         {
             commands.Add("!wpnrdy", (b) =>
             {
-                if (wait) return;
-                if (noWC(ref b)) { hasWC = false; return; }
-                if (runs >= ok && !WeaponGroups.ContainsKey(b.uID)) AddWeaponGroup(b);
-                else if (WeaponGroups.ContainsKey(b.uID))
-                    UpdateWeaponReady(ref b);
+                if (WCPBAPI.Activate(Program.Me, ref api))
+                {
+                    if (GCM.justStarted && !WeaponGroups.ContainsKey(b.uID)) AddWeaponGroup(b);
+                    else if (WeaponGroups.ContainsKey(b.uID))
+                        UpdateWeaponReady(ref b);
+                }
             });
             commands.Add("!tgt", (b) =>
             {
-                if (wait) return;
-                if (noWC(ref b)) { hasWC = false; return; }
-                else
+                if (WCPBAPI.Activate(Program.Me, ref api)) 
                 {
                     var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
                     b.Data = focus.HasValue ? focus.Value.Name : "NO TARGET";
@@ -950,12 +931,18 @@ namespace IngameScript
 
             commands.Add("!tgtdist", (b) =>
             {
-                if (wait) return;
-                if (noWC(ref b)) { hasWC = false; return; }
-                else
+                if (WCPBAPI.Activate(Program.Me, ref api))
                 {
                     var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
                     b.Data = focus.HasValue ? (focus.Value.Position - Program.Me.CubeGrid.GetPosition()).Length().ToString("4:####") : "NO TARGET";
+                }
+            });
+
+            commands.Add("!heats%", (b) =>
+            {
+                if (WCPBAPI.Activate(Program.Me, ref api))
+                {
+                    // todo
                 }
             });
         }

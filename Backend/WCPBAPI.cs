@@ -22,6 +22,7 @@ namespace IngameScript
 {
     public class WCPBAPI
     {
+        public bool isActive = false;
         private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, IDictionary<string, int>, bool> _getBlockWeaponMap;
         private Action<Sandbox.ModAPI.Ingame.IMyTerminalBlock, IDictionary<MyDetectedEntityInfo, float>> _getSortedThreats;
         private Action<Sandbox.ModAPI.Ingame.IMyTerminalBlock, ICollection<Sandbox.ModAPI.Ingame.MyDetectedEntityInfo>> _getObstructions;
@@ -44,17 +45,21 @@ namespace IngameScript
         //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, long, bool, bool, bool> _isTargetValid;
         //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, MyTuple<Vector3D, Vector3D>> _getWeaponScope;
         //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, MyTuple<bool, bool>> _isInRange;
-        static public void Activate(IMyTerminalBlock pbBlock, ref WCPBAPI apiHandle)
+        static public bool Activate(IMyTerminalBlock pbBlock, ref WCPBAPI api)
         {
-            if (apiHandle != null)
-                return;
+            if (api.isActive) 
+                return true;
+            if (api != null)
+                return false;
 
             var dict = pbBlock.GetProperty("WcPbAPI")?.As<IReadOnlyDictionary<string, Delegate>>().GetValue(pbBlock);
             if (dict == null)
-                return;
+                return false;
 
-            apiHandle = new WCPBAPI();
-            apiHandle.ApiAssign(dict);
+            api = new WCPBAPI();
+            api.ApiAssign(dict);
+            api.isActive = true;
+            return true;
         }
 
         public bool ApiAssign(IReadOnlyDictionary<string, Delegate> delegates)

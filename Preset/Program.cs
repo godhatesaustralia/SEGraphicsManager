@@ -30,7 +30,6 @@ namespace IngameScript
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
             Manager = new GraphicsManager(this, s);
             // NO TOUCH DISPLAY ;)
-            Manager.useCustomDisplays = false;
             Manager.Keys = new IniKeys();
             Manager.Inventory = new InventoryUtilities(this, s);
             Manager.Utilities.Add(new GasUtilities(ref Manager.Inventory));

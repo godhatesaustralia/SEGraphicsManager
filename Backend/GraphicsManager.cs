@@ -11,7 +11,6 @@ namespace IngameScript
     {
         #region fields
 
-        public bool useCustomDisplays;
         public MyGridProgram Program;
         public IMyGridTerminalSystem Terminal;
         public IMyProgrammableBlock Me;
@@ -20,6 +19,7 @@ namespace IngameScript
 
         Dictionary<string, Action<SpriteData>> Commands;
         List<DisplayBase> Displays, FastDisplays, Static;
+        List<CoyLogo> logos = new List<CoyLogo>();
 
         public List<UtilityBase> Utilities;
         public InventoryUtilities Inventory;
@@ -31,9 +31,9 @@ namespace IngameScript
         public bool justStarted => !setupComplete;
 
         private int dPtr, iPtr, // display pointers
-            min = 96, fast; // min - frames to wait for echo, fast - determines Priority.Fast
+            min = 256, fast; // min - frames to wait for echo, fast - determines Priority.Fast
         private double totalRt, RuntimeMS, WorstRun, AverageRun;
-        private bool frozen = false, setupComplete, draw;
+        private bool frozen = false, setupComplete, draw, useCustomDisplays, useLogo;
         private long Frame, WorstFrame;
         #endregion
 
@@ -54,6 +54,8 @@ namespace IngameScript
                 Tag = p.String(GCM, "tag", GCM);
                 Name = p.String(GCM, "groupName", "Screen Control");
                 fast = 60 / p.Byte(GCM, "maxDrawPerSecond", 4);
+                useCustomDisplays = p.Bool(GCM, "custom", true);
+                useLogo = p.Bool(GCM, "logo", false);
                 FastDisplays = new List<DisplayBase>();
             }
             else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
@@ -73,7 +75,7 @@ namespace IngameScript
 
         public void Init(bool auto = true)
         {
-            Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
+            Program.Runtime.UpdateFrequency |= UpdateFrequency.Update1 | UpdateFrequency.Update10 | UpdateFrequency.Update100;
             setupComplete = false;
             Clear(auto);
             if (auto)
@@ -85,7 +87,6 @@ namespace IngameScript
                 foreach (UtilityBase utility in Utilities)
                     utility.Setup(ref Commands);
             }
-            //Lib.lockdown(this);
             Inventory.Reset(this, Program);
             foreach (UtilityBase utility in Utilities)
                 utility.Reset(this, Program);
@@ -115,14 +116,23 @@ namespace IngameScript
             {
                 var b = DisplayBlocks.First();
                 var d = new LinkedDisplay(b, ref Commands, ref Program, ref Keys);
-                d.Setup(b);
-                DisplayBlocks.Remove(b);
-                var p = d.Priority;
+                var p = Priority.None;
+                if (useLogo && b is IMyTextPanel && b.BlockDefinition.SubtypeName == "TransparentLCDLarge")
+                {
+                    var l = new CoyLogo(b as IMyTextPanel);
+                    l.SetAnimate();
+                    logos.Add(l);
+                    p = d.Setup(b, true);
+                }
+                else p = d.Setup(b);
+
                 if (p == Priority.High && FastDisplays.Count < FastDisplays.Capacity)
                     FastDisplays.Add(d);
                 else if ((p & Priority.Normal) != 0)
                     Displays.Add(d);
                 else Static.Add(d);
+
+                DisplayBlocks.Remove(b);
             }
         }
 
@@ -144,13 +154,36 @@ namespace IngameScript
                     d.Reset();
         }
 
+        private void SetPriorities(ref List<DisplayBase> ds)
+        {
+            if (ds.Count > 0)
+                foreach (var d in ds)
+                    d.SetPriority();
+        }
+
+
         public void Update(string arg, UpdateType source)
         {
             UpdateTimes();
             if (!setupComplete)
                 RunSetup();
-            var p = Priority.Normal;
-            p |= Frame % fast == 0 ? Priority.Fast : Priority.None;
+
+            if (Frame <= min && useLogo)
+            {
+                draw = false;
+                foreach (var l in logos)
+                    l.Update("");
+                if (Frame == min)
+                {
+                    SetPriorities(ref FastDisplays);
+                    SetPriorities(ref Displays);
+                    foreach (var d in Static)
+                        d.ForceRedraw();
+                    draw = true;
+                }
+
+            }
+
             if (arg != "")
             {
                 arg = arg.ToLower();
@@ -195,18 +228,18 @@ namespace IngameScript
                             Program.Runtime.UpdateFrequency = Lib.uDef;
                             return;
                         }
-                    case "bm":
-                        {
-                            //Lib.lockdown(this);
-                            break;
-                        }
                     default: { break; }
                 }
             }
             if (!setupComplete) return;
-            if ((p & Priority.Fast) != 0)
+
+            var p = Priority.Normal;
+            if (Frame % fast == 0)
+            {
+                p |= Priority.Fast;
                 foreach (var d in FastDisplays)
                     d.Update(ref p);
+            }
             if (draw)
             {
                 Displays[Lib.Next(ref dPtr, Displays.Count)].Update(ref p);

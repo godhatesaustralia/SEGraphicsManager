@@ -31,7 +31,6 @@ namespace IngameScript
             commandID,
             Prepend,
             Append;
-        private string[] itemTags;
         public Color Color;
 
         public SpriteData[] Children;
@@ -71,13 +70,13 @@ namespace IngameScript
                 FontID = font;
                 Prepend = prepend;
                 Append = append;
-                setSB();
+                SetBuilder();
             }
         }
 
-        public void setSB() => Builder = (Prepend != "" || Append != "");          
+        public void SetBuilder() => Builder = (Prepend != "" || Append != "");          
 
-        public static MySprite createSprite(SpriteData d, bool start = false)
+        public static MySprite CreateSprite(SpriteData d, bool start = false)
         {
             if (d.uID == -1 && !start)
                 return d.sprCached;

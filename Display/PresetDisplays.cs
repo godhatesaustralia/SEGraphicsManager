@@ -37,7 +37,7 @@ namespace IngameScript
             // after this we manually fill out shit in display refresh freq, display outputs in program constructor. yeah it sucks but whatever u know
         }
 
-        public override void Setup(IMyTerminalBlock block)
+        public override Priority Setup(IMyTerminalBlock block, bool w = false)
         {
             throw new Exception(" die");
         }

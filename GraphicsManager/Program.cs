@@ -1,22 +1,23 @@
 ﻿using Sandbox.ModAPI.Ingame;
+using System.Collections.Generic;
+
 namespace IngameScript
 {
     partial class Program : MyGridProgram
     {
-        public GraphicsManager Manager;
+        GraphicsManager Manager;
         string tag = "GCM";
         public Program()
         {
+            CoyLogo.program = this;
             Manager = new GraphicsManager(this, tag);
-
-            Manager.useCustomDisplays = true;
             Manager.Keys = new IniKeys();
             
             Manager.Inventory = new InventoryUtilities(this, tag);
             Manager.Utilities.Add(new FlightUtilities(tag));
             Manager.Utilities.Add(new GasUtilities(ref Manager.Inventory));
             Manager.Utilities.Add(new PowerUtilities(ref Manager.Inventory));
-            Manager.Utilities.Add(new WeaponUtilities(Manager.Tag));
+            Manager.Utilities.Add(new WeaponUtilities());
             Manager.Init();
         }
 

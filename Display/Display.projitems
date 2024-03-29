@@ -9,6 +9,7 @@
     <Import_RootNamespace>Display</Import_RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="$(MSBuildThisFileDirectory)CoyLogo.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)DrawUtilities.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)LinkedDisplay.cs" />
     <Compile Include="$(MSBuildThisFileDirectory)PresetDisplays.cs" />

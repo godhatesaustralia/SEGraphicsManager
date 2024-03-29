@@ -32,13 +32,13 @@ namespace IngameScript
 
         protected MyGridProgram Program;
         protected Dictionary<IMyTextSurface, HashSet<string>> CommandUsers;
-
         public Priority Priority;
         public Dictionary<string, Action<SpriteData>> Commands;
         public Dictionary<IMyTextSurface, Dictionary<string, SpriteData>> Outputs;
         public Dictionary<IMyTextSurface, Priority> Refresh;
         public readonly string Name;
         public readonly long dEID;
+        protected Priority val;
 
         #endregion
 
@@ -46,6 +46,7 @@ namespace IngameScript
         {
             Name = b.CustomName;
             dEID = b.EntityId;
+            Priority = Priority.None;
         }
 
         public void Reset()
@@ -61,9 +62,27 @@ namespace IngameScript
             Outputs.Clear();
         }
 
-        public abstract void Setup(IMyTerminalBlock block);
+        public abstract Priority Setup(IMyTerminalBlock block, bool wait = false);
 
         public abstract void Update(ref Priority p);
+
+        public void ForceRedraw()
+        {
+            foreach (var display in Outputs)
+            {
+                var frame = display.Key.DrawFrame();
+                foreach (var sprite in display.Value)
+                    DrawNewSprite(ref frame, sprite.Value);
+                frame.Dispose();
+            }
+        }
+
+        // breaking this out, to run only when logo is done - i think it makes more sense
+        public void SetPriority()
+        {
+            foreach (var val in Refresh.Values)
+                Priority |= val;
+        }
 
         protected void DrawNewSprite(ref MySpriteDrawFrame frame, SpriteData data)
         {
@@ -73,7 +92,7 @@ namespace IngameScript
                 return;
             }
             //Program.Me.CustomData += $"\n{s.dType}, \n{s.Data}, \n{s.Size}, \n{s.Position}, \n{s.dColor}, \n{s.Alignment}\n";
-            frame.Add(SpriteData.createSprite(data));
+            frame.Add(SpriteData.CreateSprite(data));
         }
 
     }
@@ -91,6 +110,11 @@ namespace IngameScript
             Outputs = new Dictionary<IMyTextSurface, Dictionary<string, SpriteData>>();
             Program = program;
             Keys = keys;
+            //var s = block as IMyTextSurfaceProvider;
+            isSingleScreen = block is IMyTextSurface; // || s.SurfaceCount == 1;
+            // MAREK ROSA I AM COMING TO KILL YOU!!!!! AT YOUR HOUSE!! IN PRAGUE!!!
+            //if (block.BlockDefinition.SubtypeName == "LargeBlockInsetEntertainmentCorner")
+            //    isSingleScreen = true;
         }
 
         // [Custom Data Formatting]
@@ -156,7 +180,7 @@ namespace IngameScript
                             else 
                                 s.RorS = ini.Float(nametag, Keys.Scale, 0);
 
-                            s.FontID = s.Type == Lib.dType ? ini.String(nametag, Keys.Font, "Monospace") : "";
+                            s.FontID = s.Type == Lib.dType ? ini.String(nametag, Keys.Font, "White") : "";
                             s.Priority = (Priority)ini.Byte(nametag, Keys.Update, 0);
                             p |= s.Priority;
 
@@ -179,10 +203,10 @@ namespace IngameScript
                                     if (ini.hasKey(nametag, Keys.Append))
                                         s.Append = " " + ini.String(nametag, Keys.Append);
 
-                                    s.setSB();
+                                    s.SetBuilder();
                                 }
                             }
-                            s.sprCached = SpriteData.createSprite(s, true);
+                            s.sprCached = SpriteData.CreateSprite(s, true);
                             if (!Outputs[surf].ContainsKey(s.Name))
                                 Outputs[surf].Add(s.Name, s);
                         }
@@ -202,11 +226,13 @@ namespace IngameScript
         private void Default(ref IMyTextSurface s)
         { 
             var c = (s.TextureSize - s.SurfaceSize) / 2;
-            var d = new SpriteData(Color.White, Name, "", c.X + (c.X * 0.4f), c.Y + (c.Y * 0.4f), 0.4375f);
+            var r = s.TextureSize / s.SurfaceSize;
+            var uh = 20 * r + 0.5f * c;
+            var d = new SpriteData(Color.White, Name, "", uh.X , uh.Y + (c.Y * 0.4f),  c.Length() * 0.005275f, align: TextAlignment.LEFT);
             s.ScriptBackgroundColor = Color.Blue;
-            d.Data = $"{Name}\nSURFACE {s.Name}\nSCREEN SIZE {s.SurfaceSize}\nTEXTURE SIZE {s.TextureSize}\n\n\n{Lib.bsod}";
+            d.Data = $"{Name}\nSURFACE {s.Name}\nSCREEN SIZE {s.SurfaceSize}\nTEXTURE SIZE {s.TextureSize}\nPOSITION OF THIS THING {uh}\n\n\n{Lib.bsod}";
             d.FontID = "Monospace";
-            d.sprCached = SpriteData.createSprite(d, true);
+            d.sprCached = SpriteData.CreateSprite(d, true);
             var f = s.DrawFrame();
             Outputs[s].Add(Name, d);
             f.Dispose();
@@ -229,25 +255,24 @@ namespace IngameScript
             }
         }
 
-        public override void Setup(IMyTerminalBlock block)
+        public override Priority Setup(IMyTerminalBlock block, bool w = false)
         {
             iniWrap p = new iniWrap();
             byte index = 0;
             MyIniParseResult Result;
-            var pri = Priority.None;
+            Priority ret, pri = ret = Priority.None;
             if (p.CustomData(block, out Result))
             {
                 if (block is IMyTextSurface)
                 {
                     var DisplayBlock = (IMyTextSurface)block;
                     Outputs.Add(DisplayBlock, new Dictionary<string, SpriteData>());
-                    isSingleScreen = true;
                     if (TryAddSprites(ref DisplayBlock, ref p, ref index, out pri))
                         Refresh.Add(DisplayBlock, pri);
+                    ret = pri;
                 }
                 else if (block is IMyTextSurfaceProvider)
                 {
-                    isSingleScreen = false;
                     var DisplayBlock = (IMyTextSurfaceProvider)block;
                     var SurfaceCount = DisplayBlock.SurfaceCount;
 
@@ -263,11 +288,18 @@ namespace IngameScript
                             Refresh.Add(surface, pri);
                         else
                             Refresh.Add(surface, Priority.None);
+                        ret |= pri;
                     }
                 }
             }
             else throw new Exception($" PARSE FAILURE: {Name} cd error {Result.Error} at {Result.LineNo}");
             p.Dispose();
+
+            if (!w) SetPriority();
+
+            foreach (var kvp in CommandUsers)
+                foreach (var s in kvp.Value)
+                    Outputs[kvp.Key][s].Command.Invoke(Outputs[kvp.Key][s]);
 
             foreach (var display in Outputs)
             {
@@ -276,15 +308,8 @@ namespace IngameScript
                     DrawNewSprite(ref frame, sprite.Value);
                 frame.Dispose();
             }
-            foreach (var val in Refresh.Values)
-                Priority |= (Priority)((byte)val);
-
-            foreach (var kvp in CommandUsers)
-                foreach (var s in kvp.Value)
-                    Outputs[kvp.Key][s].Command.Invoke(Outputs[kvp.Key][s]);
-
+            return ret;
         }
-
         public override void Update(ref Priority p)
         {
             foreach (var display in Outputs)
@@ -298,12 +323,12 @@ namespace IngameScript
                                 Lib.ApplyBuilder(display.Value[n]);
                         }
                     var frame = display.Key.DrawFrame();
+
                     foreach (var sprite in display.Value)
                         DrawNewSprite(ref frame, sprite.Value);
 
                     frame.Dispose();
                 }
-
         }
 
     }
