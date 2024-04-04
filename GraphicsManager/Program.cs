@@ -1,4 +1,5 @@
 ﻿using Sandbox.ModAPI.Ingame;
+using System;
 using System.Collections.Generic;
 
 namespace IngameScript
@@ -23,7 +24,9 @@ namespace IngameScript
 
         public void Main(string argument, UpdateType updateSource)
         {
-            Manager.Update(argument, updateSource);
+                Manager.Update(argument, updateSource);
+
+
         }
     }
 }

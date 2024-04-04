@@ -633,6 +633,11 @@ namespace IngameScript
 
         public override void Update()
         {
+            if (Items.Count == 0)
+            {
+                needsUpdate = false;
+                return;
+            }
             int n = Math.Min(Items.Count, iiPtr + updateStep);
             for (; iiPtr < n; iiPtr++)
                 Items.Values[iiPtr].Update();

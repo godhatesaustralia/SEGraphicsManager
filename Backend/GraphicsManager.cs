@@ -111,7 +111,15 @@ namespace IngameScript
         private void RunSetup()
         {
             if (DisplayBlocks.Count == 0)
+            {
                 setupComplete = true;
+                if (Displays.Count == 0)
+                {
+                    Program.Runtime.UpdateFrequency = UpdateFrequency.None;
+                    Program.Echo("No commands detected on active displays. Script shutting down.");
+                    draw = false;
+                }
+            }
             else
             {
                 var b = DisplayBlocks.First();
