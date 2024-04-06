@@ -277,12 +277,16 @@ namespace IngameScript
         public string ID => Tag + '!' + Type.SubtypeId;
         public readonly string Tag;
         private readonly InventoryUtilities Inventory;
-
+        public Action ItemUpdate = null;
         public ItemInfo(string t, string st, InventoryUtilities iu)
         {
             Inventory = iu;
             Tag = t;
             Type = new MyItemType(InventoryUtilities.myObjectBuilder + '_' + t, st);
+            if (!Type.GetItemInfo().IsAmmo)
+                ItemUpdate = () => quantity = Inventory.ItemQuantity(ref Inventory.InventoryBlocksNoGuns, this);
+            else
+                ItemUpdate = () => Update();
             Update();
         }
 
@@ -296,22 +300,24 @@ namespace IngameScript
 
         public IMyProgrammableBlock Reference;
         public static string myObjectBuilder = "MyObjectBuilder";
-        public string Section, J = "JIT";
+        public string Section, J = "JIT", DebugString;
         int updateStep = 5, iiPtr;
-        bool ignoreTanks;
+        bool ignoreTanks, vanilla;
         public bool needsUpdate;
-        public List<IMyTerminalBlock> InventoryBlocks = new List<IMyTerminalBlock>();
+        public List<IMyTerminalBlock> InventoryBlocks = new List<IMyTerminalBlock>(), InventoryBlocksNoGuns = new List<IMyTerminalBlock>();
         private Dictionary<long, string[]>
             itemKeys = new Dictionary<long, string[]>(),
             itemTags = new Dictionary<long, string[]>();
         // you know i had to do it to em
         public SortedList<string, ItemInfo> Items = new SortedList<string, ItemInfo>();
+        DebugAPI Debug;
         public int Pointer => iiPtr + 1;
 
-        public InventoryUtilities(MyGridProgram program, string s)
+        public InventoryUtilities(MyGridProgram program, string s, DebugAPI api = null)
         {
             Section = s;
             Reference = program.Me;
+            Debug = api;
         }
 
         #region inventorystuff
@@ -474,14 +480,20 @@ namespace IngameScript
         public int ItemQuantity<T>(ref List<T> blocks, ItemInfo item)
             where T : IMyTerminalBlock
         {
+            //DebugString = "";
             int amt = 0, i = 0;
-            for(; i < blocks.Count; i++)
+            //var sum = 0d;
+            //var b = blocks[i];
+            for (; i < blocks.Count; i++)
+             //using (Debug.Measure((t) => { DebugString += $"{i}. Polling {b.CustomName}, {t.TotalMilliseconds} ms\n"; sum += t.TotalMilliseconds; }))
             {
+                
                 var inv = blocks[i]?.GetInventory();
-                if (inv == null || !inv.ContainItems(1, item.Type))
+                if (inv == null)
                     continue;
                 amt += inv.GetItemAmount(item.Type).ToIntSafe();
             }
+            //DebugString += $"SUM = {sum} ms";
             return amt;
         }
 
@@ -547,6 +559,7 @@ namespace IngameScript
             //foreach (var key in Items.Keys) s += $"\n{key}";
             //throw new Exception(s);
             data = itemTags[id][0] + Items[itemKeys[id][0]].ToString();
+            
             if (itemKeys[id].Length == 1)
                 return;
             for (int i = 1; i < itemKeys[id].Length; i++)
@@ -573,13 +586,24 @@ namespace IngameScript
         public override void GetBlocks()
         {
             InventoryBlocks.Clear();
+            InventoryBlocksNoGuns.Clear();
             TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
             {
-                var i = b.HasInventory && b.IsSameConstructAs(Reference);
+                
+                bool i = b.HasInventory && b.IsSameConstructAs(Reference);
                 if (ignoreTanks)
                     if (b is IMyGasTank)
                         return false;
-                if (i) InventoryBlocks.Add(b);
+                if (i)
+                {
+                    if (vanilla)
+                    {
+                        if (!(b is IMyUserControllableGun)) 
+                            InventoryBlocksNoGuns.Add(b);
+                    }
+                    InventoryBlocks.Add(b);
+                }
+                
                 return i;
             });
         }
@@ -589,7 +613,12 @@ namespace IngameScript
             Items.Clear();
             var p = new iniWrap();
             if (p.CustomData(Reference))
+            {
                 ignoreTanks = p.Bool(Section, "ignoreTanks", true);
+                updateStep = p.Byte(Section, "invStep", 5);
+                vanilla = p.Bool(Section, "nilla", false);
+            }
+
             commands.Add("!item", (b) =>
             {
                 if (GCM.justStarted)
@@ -623,11 +652,7 @@ namespace IngameScript
             {
                 if (!GCM.justStarted)
                     return;
-                string debug = $"INVENTORIES - {InventoryBlocks.Count}";
-
-                foreach (var item in Items.Keys)
-                    debug += $"\n{item.ToUpper()}";
-                b.Data = debug;
+                b.Data = $"INVENTORIES = {InventoryBlocks.Count}\nNON-WEAPONS = {InventoryBlocksNoGuns.Count}";
             });
         }
 
@@ -640,7 +665,7 @@ namespace IngameScript
             }
             int n = Math.Min(Items.Count, iiPtr + updateStep);
             for (; iiPtr < n; iiPtr++)
-                Items.Values[iiPtr].Update();
+                Items.Values[iiPtr].ItemUpdate.Invoke();
             if (n == Items.Count)
             {
                 iiPtr = 0;

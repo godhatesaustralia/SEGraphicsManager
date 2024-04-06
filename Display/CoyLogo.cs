@@ -25,6 +25,7 @@ namespace IngameScript
         int updateFrequency = 1;
         int lastStartStep = 0;
         Dictionary<int, int> alphaDict = new Dictionary<int, int>();
+        public Color color;
 
         public CoyLogo(IMyTextPanel drawingSurface)
         {
@@ -273,8 +274,8 @@ namespace IngameScript
         private void Animate()
         {
             var frame = drawingSurface.DrawFrame();
-            var v = new Vector2(256, 256);
-            frame.Add(new MySprite(SpriteType.TEXTURE, "SquareHollow", v, 2 * v, Color.White, null, TextAlignment.CENTER));
+            //var v = new Vector2(256, 256);
+            //frame.Add(new MySprite(SpriteType.TEXTURE, "SquareHollow", v, 2 * v, color, null, TextAlignment.CENTER));
 
             for (int i = 0; i <= groupIndex; i++)
             {
@@ -282,16 +283,21 @@ namespace IngameScript
 
                 var newAlpha = Math.Min(255, alphaDict[i] + (int)Math.Ceiling(255 / (double)spriteGroup.steps));
                 alphaDict[i] = newAlpha;
-
+                
                 for (int j = 0; j < spriteGroup.sprites.Count; j++)
                 {
                     var sprite = spriteGroup.sprites[j];
-                    sprite.Color = newAlpha == 255 ? Color.White : new Color(100, 100, 100, newAlpha);
+                    sprite.Color = newAlpha == 255 ? color: AlphaColor(newAlpha);
                     frame.Add(sprite);
                 }
             }
 
             frame.Dispose();
+        }
+
+        private Color AlphaColor(float na)
+        {
+            return new Color(color.R / na, color.G / na, color.B / na, na);
         }
 
         private void AnimateReverse()
@@ -321,7 +327,7 @@ namespace IngameScript
                 for (int j = 0; j < spriteGroup.sprites.Count; j++)
                 {
                     var sprite = spriteGroup.sprites[j];
-                    sprite.Color = newAlpha == 255 ? Color.White : new Color(100, 100, 100, newAlpha);
+                    sprite.Color = newAlpha == 255 ? color : AlphaColor(newAlpha);
 
                     frame.Add(sprite);
                 }
@@ -334,7 +340,7 @@ namespace IngameScript
         {
             //TODO: figure out how to rotate for wide LCD
             pos.Y = pos.Y + yOffset;
-            return new MySprite(SpriteType.TEXTURE, shape, pos, size, rotation: rotation, alignment: TextAlignment.CENTER);
+            return new MySprite(SpriteType.TEXTURE, shape, pos, size, color, rotation: rotation, alignment: TextAlignment.CENTER);
         }
     }
 

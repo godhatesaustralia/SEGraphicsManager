@@ -35,6 +35,7 @@ namespace IngameScript
         private double totalRt, RuntimeMS, WorstRun, AverageRun;
         private bool frozen = false, setupComplete, draw, useCustomDisplays, useLogo;
         private long Frame, WorstFrame;
+        private Priority p;
         #endregion
 
         public GraphicsManager(MyGridProgram program, string t)
@@ -59,7 +60,6 @@ namespace IngameScript
                 FastDisplays = new List<DisplayBase>();
             }
             else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
-            Commands.Add("!def", (b) => { return; });
         }
 
         public void Clear(bool auto)
@@ -83,6 +83,14 @@ namespace IngameScript
                 Terminal.GetBlocksOfType(Blocks);
                 Frame = WorstFrame = 0;
                 RuntimeMS = WorstRun = AverageRun = totalRt = 0;
+                Commands.Add("!def", (b) => { return; });
+                Commands.Add("!date", (b) => b.Data = DateTime.Now.ToString());
+                Commands.Add("!time", (b) =>
+                {
+                    var time = DateTime.Now.TimeOfDay;
+                    b.Data = $"{timeFormat(time.Hours)}:{timeFormat(time.Minutes)}";
+                });
+                Commands.Add("!rt", (b) => b.Data = AverageRun.ToString("0.####"));
                 Inventory.Setup(ref Commands);
                 foreach (UtilityBase utility in Utilities)
                     utility.Setup(ref Commands);
@@ -100,7 +108,7 @@ namespace IngameScript
                 while (DisplayBlocks.Count > 0)
                     RunSetup();
         }
-
+        private string timeFormat(int num) => num < 10 ? $"0{num}" : $"{num}";
         private void UpdateTimes()
         {
             RuntimeMS += Program.Runtime.TimeSinceLastRun.TotalMilliseconds;
@@ -125,12 +133,16 @@ namespace IngameScript
                 var b = DisplayBlocks.First();
                 var d = new LinkedDisplay(b, ref Commands, ref Program, ref Keys);
                 var p = Priority.None;
-                if (useLogo && b is IMyTextPanel && b.BlockDefinition.SubtypeName == "TransparentLCDLarge")
+                var st = b.BlockDefinition.SubtypeName;
+                if (useLogo && b is IMyTextPanel && (st == "TransparentLCDLarge" || st == "HoloLCDLarge"))
                 {
+                    int c = logos.Count;
                     var l = new CoyLogo(b as IMyTextPanel);
                     l.SetAnimate();
                     logos.Add(l);
                     p = d.Setup(b, true);
+                    logos[c].color = d.logoColor;
+
                 }
                 else p = d.Setup(b);
 
@@ -175,7 +187,7 @@ namespace IngameScript
             UpdateTimes();
             if (!setupComplete)
                 RunSetup();
-
+            p = Priority.Normal;
             if (Frame <= min && useLogo)
             {
                 draw = false;
@@ -188,6 +200,7 @@ namespace IngameScript
                     foreach (var d in Static)
                         d.ForceRedraw();
                     draw = true;
+                    p |= Priority.Once;
                 }
 
             }
@@ -241,7 +254,7 @@ namespace IngameScript
             }
             if (!setupComplete) return;
 
-            var p = Priority.Normal;
+            
             if (Frame % fast == 0)
             {
                 p |= Priority.Fast;
@@ -281,6 +294,7 @@ namespace IngameScript
                 else r += $"UTILS {iPtr + 1}/{Utilities.Count} - {Utilities[iPtr].Name}";
 
                 r += $"\nRUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun.ToString("0.####")} ms\nWORST - {WorstRun} ms, F{WorstFrame}\n";
+                //r = Inventory.DebugString;
                 Program.Echo(r);
             }
         }

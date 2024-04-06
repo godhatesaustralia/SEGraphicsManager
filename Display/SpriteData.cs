@@ -27,6 +27,7 @@ namespace IngameScript
         public string
             Name,
             Data,
+            DataPrev,
             FontID = "White",
             commandID,
             Prepend,
@@ -74,6 +75,24 @@ namespace IngameScript
             }
         }
 
+        private static void ApplyBuilder(SpriteData d)
+        {
+            if (d.commandID.Contains("list")) return;
+            StringBuilder builder = new StringBuilder(d.Data);
+            builder.Insert(0, d.Prepend);
+            builder.Append(d.Append);
+            d.Data = builder.ToString();
+        }
+
+        public bool Update()
+        {
+            Command.Invoke(this);
+            if (Builder) ApplyBuilder(this);
+            var b = Data != DataPrev && commandID != "";
+            DataPrev = Data;
+            return b;
+        }
+
         public void SetBuilder() => Builder = (Prepend != "" || Append != "");          
 
         public static MySprite CreateSprite(SpriteData d, bool start = false)
@@ -102,6 +121,7 @@ namespace IngameScript
                 d.Alignment,
                 MathHelper.ToRadians(d.RorS)
             );
+         
                 return sprite;
             }
         }

@@ -14,7 +14,7 @@ namespace IngameScript
             Manager = new GraphicsManager(this, tag);
             Manager.Keys = new IniKeys();
             
-            Manager.Inventory = new InventoryUtilities(this, tag);
+            Manager.Inventory = new InventoryUtilities(this, tag, new DebugAPI(this));
             Manager.Utilities.Add(new FlightUtilities(tag));
             Manager.Utilities.Add(new GasUtilities(ref Manager.Inventory));
             Manager.Utilities.Add(new PowerUtilities(ref Manager.Inventory));

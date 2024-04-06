@@ -30,7 +30,7 @@ namespace IngameScript
 
             this.logoPieces = new List<SpriteGroup> {
                     new SpriteGroup(
-                        new List<MySprite> { Sprite("SquareHollow", viewport.Center, new Vector2(512, 512), 0),
+                        new List<MySprite> { /*Sprite("SquareHollow", viewport.Center, new Vector2(512, 512), 0),*/
                             Sprite("SquareSimple", new Vector2(245.07f, 51.47f), new Vector2(72.13f, 56.27f), 0.192f),  //Body-1
                         }
                     ),

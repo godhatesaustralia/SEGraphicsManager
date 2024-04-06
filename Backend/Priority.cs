@@ -26,7 +26,8 @@ namespace IngameScript
         None,
         Normal,
         Fast,
-        High 
+        High,
+        Once
     }
 
 }

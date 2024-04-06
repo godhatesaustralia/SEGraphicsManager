@@ -100,7 +100,10 @@ namespace IngameScript
     public class LinkedDisplay : DisplayBase
     {
         readonly IniKeys Keys;
+        readonly IMyFunctionalBlock Host;
+        bool isEnabled => Host?.Enabled ?? true ;
         bool isSingleScreen;
+        public Color logoColor = Color.White;
 
         public LinkedDisplay(IMyTerminalBlock block, ref Dictionary<string, Action<SpriteData>> commandsDict, ref MyGridProgram program, ref IniKeys keys) : base(block)
         {
@@ -110,6 +113,9 @@ namespace IngameScript
             Outputs = new Dictionary<IMyTextSurface, Dictionary<string, SpriteData>>();
             Program = program;
             Keys = keys;
+            IMyFunctionalBlock f = block as IMyFunctionalBlock;
+            if (f != null)
+                Host = f;
             //var s = block as IMyTextSurfaceProvider;
             isSingleScreen = block is IMyTextSurface; // || s.SurfaceCount == 1;
             // MAREK ROSA I AM COMING TO KILL YOU!!!!! AT YOUR HOUSE!! IN PRAGUE!!!
@@ -142,6 +148,16 @@ namespace IngameScript
                 surf.Script = "";
                 surf.ScriptBackgroundColor = ini.Color(sect, Keys.Color + "_BG");
                 var fail = "~";
+                if (ini.hasKey(sect, Keys.Color + "_L"))
+                    logoColor = ini.Color(sect, Keys.Color + "_L");
+
+                if (isSingleScreen && ini.Bool(sect, Keys.Logo))
+                {
+                    Priority = Priority.None;
+                    Outputs.Clear();
+                    return true;
+                }
+      
                 var names = ini.String(sect, Keys.List, fail);
                 if (names == fail)
                 {
@@ -294,12 +310,12 @@ namespace IngameScript
             }
             else throw new Exception($" PARSE FAILURE: {Name} cd error {Result.Error} at {Result.LineNo}");
             p.Dispose();
-
+            if (Outputs.Count == 0) return Priority.None;
             if (!w) SetPriority();
 
             foreach (var kvp in CommandUsers)
                 foreach (var s in kvp.Value)
-                    Outputs[kvp.Key][s].Command.Invoke(Outputs[kvp.Key][s]);
+                    Outputs[kvp.Key][s].Update();
 
             foreach (var display in Outputs)
             {
@@ -312,18 +328,20 @@ namespace IngameScript
         }
         public override void Update(ref Priority p)
         {
+            
+            if (!isEnabled) return;
             foreach (var display in Outputs)
                 if ((Refresh[display.Key] & p) != 0) 
-                {                                                                  
+                {
+                    bool changed = false;
                     foreach (var n in display.Value.Keys)
                         if (CommandUsers[display.Key].Contains(n))
                         {
-                            display.Value[n].Command.Invoke(display.Value[n]);
-                            if (display.Value[n].Builder)
-                                Lib.ApplyBuilder(display.Value[n]);
+                            if(display.Value[n].Update())
+                                changed = true;
                         }
                     var frame = display.Key.DrawFrame();
-
+                    if (!changed) continue;
                     foreach (var sprite in display.Value)
                         DrawNewSprite(ref frame, sprite.Value);
 
