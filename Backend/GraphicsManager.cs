@@ -134,7 +134,7 @@ namespace IngameScript
                 var d = new LinkedDisplay(b, ref Commands, ref Program, ref Keys);
                 var p = Priority.None;
                 var st = b.BlockDefinition.SubtypeName;
-                if (useLogo && b is IMyTextPanel && (st == "TransparentLCDLarge" || st == "HoloLCDLarge"))
+                if (useLogo && b is IMyTextPanel/* && (st == "TransparentLCDLarge" || st == "HoloLCDLarge")*/)
                 {
                     int c = logos.Count;
                     var l = new CoyLogo(b as IMyTextPanel);
