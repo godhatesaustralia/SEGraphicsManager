@@ -283,7 +283,7 @@ namespace IngameScript
             Inventory = iu;
             Tag = t;
             Type = new MyItemType(InventoryUtilities.myObjectBuilder + '_' + t, st);
-            if (!Type.GetItemInfo().IsAmmo)
+            if (!Type.GetItemInfo().IsAmmo && !iu.ignoreGuns)
                 ItemUpdate = () => quantity = Inventory.ItemQuantity(ref Inventory.InventoryBlocksNoGuns, this);
             else
                 ItemUpdate = () => Update();
@@ -302,7 +302,7 @@ namespace IngameScript
         public static string myObjectBuilder = "MyObjectBuilder";
         public string Section, J = "JIT", DebugString;
         int updateStep = 5, iiPtr;
-        bool ignoreTanks, vanilla;
+        public bool ignoreTanks, vanilla, ignoreGuns;
         public bool needsUpdate;
         public List<IMyTerminalBlock> InventoryBlocks = new List<IMyTerminalBlock>(), InventoryBlocksNoGuns = new List<IMyTerminalBlock>();
         private Dictionary<long, string[]>
@@ -596,11 +596,15 @@ namespace IngameScript
                         return false;
                 if (i)
                 {
-                    if (vanilla)
+                    if (b.BlockDefinition.SubtypeId == "LargeInteriorTurret")
+                        return false;
+                    if (vanilla && !ignoreGuns)
                     {
                         if (!(b is IMyUserControllableGun)) 
                             InventoryBlocksNoGuns.Add(b);
                     }
+                    else if (b is IMyUserControllableGun && ignoreGuns) 
+                        return false;
                     InventoryBlocks.Add(b);
                 }
                 
@@ -615,8 +619,9 @@ namespace IngameScript
             if (p.CustomData(Reference))
             {
                 ignoreTanks = p.Bool(Section, "ignoreTanks", true);
-                updateStep = p.Byte(Section, "invStep", 5);
                 vanilla = p.Bool(Section, "nilla", false);
+                ignoreGuns = vanilla && p.Bool(Section, "nogunz", false);
+                updateStep = p.Byte(Section, "invStep", 5);
             }
 
             commands.Add("!item", (b) =>
@@ -652,7 +657,8 @@ namespace IngameScript
             {
                 if (!GCM.justStarted)
                     return;
-                b.Data = $"INVENTORIES = {InventoryBlocks.Count}\nNON-WEAPONS = {InventoryBlocksNoGuns.Count}";
+                b.Data = $"INVENTORIES = {InventoryBlocks.Count}\n";
+                b.Data += ignoreGuns ? "WEAPONS NOT COUNTED" : $"NON - WEAPONS = { InventoryBlocksNoGuns.Count}";
             });
         }
 
