@@ -148,11 +148,11 @@ namespace IngameScript
             });
             commands.Add("!h2t", (b) =>
             {
-                if (GCM.justStarted)
+                if (GCM.justStarted && !hTime.ContainsKey(b.uID))
                 {
-                    if (b.Data == "sec")
+                    if (b.Data.ToLower() == "sec")
                         hTime.Add(b.uID, 1);
-                    else if (b.Data == "min")
+                    else if (b.Data.ToLower() == "min")
                         hTime.Add(b.uID, 2);
                     else hTime.Add(b.uID, 0);
                 }
@@ -211,7 +211,7 @@ namespace IngameScript
                     return string.Format("{0,2}h {1,2}m", (long)time.TotalHours, (long)time.Minutes);
                 else
                     return string.Format("{0,2}m {1,2}s", (long)time.TotalMinutes, (long)time.Seconds);
-            else if (sw == 1) return time.TotalSeconds.ToString();
+            else if (sw == 1) return time.TotalSeconds.ToString("####");
             else if (sw == 2) return time.TotalMinutes.ToString();
             else return invalid;
         }
