@@ -29,14 +29,14 @@ using VRageRender;
 
 namespace IngameScript
 {
-    public interface IInfo
-    {
-        double Data { get; }
-        void Update();
-    }
+    //public interface IInfo
+    //{
+    //    double Data { get; }
+    //    void Update();
+    //}
 
 
-    public class Info : IInfo
+    public class Info// : IInfo
     {
         public double Data => data;
         private double data;
@@ -71,9 +71,10 @@ namespace IngameScript
             Program = program;
             TerminalSystem = program.GridTerminalSystem;
             jitSprite.uID = long.MinValue;
+            GetBlocks();
         }
 
-        public virtual void GetBlocks() {}
+        public abstract void GetBlocks();
         public abstract void Update();
         public abstract void Setup(ref Dictionary<string, Action<SpriteData>> commands);
 
@@ -104,12 +105,11 @@ namespace IngameScript
             Inventory = inv;
         }
 
-        #region InfoUtility
+        #region UtilityBase
         public override void Reset(GraphicsManager m, MyGridProgram p)
         {
             base.Reset(m, p);
             hTime.Clear();
-            GetBlocks();
             HydrogenStatus();
             OxygenStatus();
             HydrogenTime(0);
@@ -121,7 +121,6 @@ namespace IngameScript
             OxygenTanks.Clear();
             TerminalSystem.GetBlocksOfType(HydrogenTanks, (b) => b.BlockDefinition.SubtypeId.Contains("Hyd"));
             TerminalSystem.GetBlocksOfType(OxygenTanks, (b) => !HydrogenTanks.Contains(b));
-            base.GetBlocks();
         }
 
         public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
@@ -268,7 +267,7 @@ namespace IngameScript
         }
     }
 
-    public class ItemInfo : IInfo
+    public class ItemInfo// : IInfo
     {
         public double Data => quantity;
         private double quantity;
@@ -566,12 +565,11 @@ namespace IngameScript
                 data += $"\n{itemTags[id][i]}{Items[itemKeys[id][i]]}";
         }
 
-        #region InfoUtility
+        #region UtilityBase
 
         public override void Reset(GraphicsManager m, MyGridProgram p)
         {
             base.Reset(m, p);
-            GetBlocks();
             var jitItem = new ItemInfo("Ingot", J, this);
             var temp = new Queue<double>();
             var d = 0d;
@@ -682,14 +680,57 @@ namespace IngameScript
         #endregion
     }
 
-    //public class BlockUtilities : UtilityBase
-    //{
+    public class BlockInfo<T>// : IInfo
+        where T : IMyFunctionalBlock
+    { 
+    
+    }
 
-    //}
+
+    public class BlockUtilities : UtilityBase
+    {
+        List<IMyTerminalBlock> AllBlocks = new List<IMyTerminalBlock>();
+        List<IMyBlockGroup> AllGroups = new List<IMyBlockGroup>();
+        Dictionary<long, long[]> BlockKeys = new Dictionary<long, long[]>();
+        // TODO: make a new class or something (if i dont kill myself this week)
+        Dictionary<long, IMyFunctionalBlock> BlockData = new Dictionary<long, IMyFunctionalBlock>(); //temp
+        #region UtilityBase
+
+        public override void GetBlocks()
+        {
+            AllBlocks.Clear();
+            BlockKeys.Clear();
+            GCM.Terminal.GetBlocksOfType(AllBlocks);
+            GCM.Terminal.GetBlockGroups(AllGroups);
+        }
+
+        public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
+        {
+            commands.Add("!status", (b) =>
+            {
+                if (GCM.justStarted && !BlockKeys.ContainsKey(b.uID))
+                {
+                    var blcok = AllBlocks.Find(c => c.CustomName == b.Data);
+                    if (blcok != null && blcok is IMyFunctionalBlock)
+                    {
+                        BlockData.Add(blcok.EntityId, (IMyFunctionalBlock)blcok);
+                        BlockKeys.Add(b.uID, new long[] { blcok.EntityId });
+                    }
+                }
+                if (BlockKeys.ContainsKey(b.uID))
+                    b.Data = BlockData[BlockKeys[b.uID][0]].IsFunctional ? "ON" : "OFF";
+            });
+        }
+
+        public override void Update()
+        {
+
+        }
+        #endregion
+    }
 
     public class FlightUtilities : UtilityBase
     {
-        //IMyCubeGrid Ship; //fuvckoff
         IMyShipController Controller;
         List<IMyJumpDrive> JumpDrives = new List<IMyJumpDrive>();
         double lastDist, maxDist;
@@ -707,16 +748,15 @@ namespace IngameScript
             ctrl = c;
         }
 
-        #region InfoUtility
+        #region UtilityBase
 
         public override void Reset(GraphicsManager m, MyGridProgram p)
         {
-            base.Reset(m, p);
             var par = new iniWrap();
             par.CustomData(m.Me);
             std = par.String(tag, fmat, "0000");
             ctrlName = par.String(tag, ctrl, "[I]");
-            GetBlocks();
+            base.Reset(m, p);
         }
 
         public override void GetBlocks()
@@ -860,12 +900,11 @@ namespace IngameScript
             name = "Power";
             U = new UseRate("Ingot!Uranium");
         }
-        #region InfoUtility
+        #region UtilityBase
         public override void Reset(GraphicsManager m, MyGridProgram p)
         {
             gridRef = p.Me;
             base.Reset(m, p);
-            GetBlocks();
         }
 
         public override void GetBlocks()
@@ -961,12 +1000,10 @@ namespace IngameScript
             name = "Weapons";
         }
 
-        #region InfoUtility
+        #region UtilityBase
         public override void Reset(GraphicsManager m, MyGridProgram p)
         {
             base.Reset(m, p);
-            if (WCPBAPI.Activate(Program.Me, ref api))
-                GetBlocks();
             WeaponGroups.Clear();
             man = true;
         }
@@ -1010,6 +1047,8 @@ namespace IngameScript
 
         public override void GetBlocks()
         {
+            if (!WCPBAPI.Activate(Program.Me, ref api))
+                return;
             wcWeapons.Clear();
             foreach (var t in tagStorage.Values)
             TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>

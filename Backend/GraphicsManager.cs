@@ -24,7 +24,7 @@ namespace IngameScript
         public List<UtilityBase> Utilities;
         public InventoryUtilities Inventory;
 
-        public List<IMyTerminalBlock> Blocks = new List<IMyTerminalBlock>();
+
         HashSet<IMyTerminalBlock> DisplayBlocks = new HashSet<IMyTerminalBlock>();
   
         public IniKeys Keys;
@@ -67,7 +67,6 @@ namespace IngameScript
             dPtr = -1;
             if (auto) Commands.Clear();
             Displays.Clear();
-            Blocks.Clear();
             DisplayBlocks.Clear();
             Lib.GraphStorage.Clear();
             Lib.lights.Clear();
@@ -80,7 +79,6 @@ namespace IngameScript
             Clear(auto);
             if (auto)
             {
-                Terminal.GetBlocksOfType(Blocks);
                 Frame = WorstFrame = 0;
                 RuntimeMS = WorstRun = AverageRun = totalRt = 0;
                 Commands.Add("!def", (b) => { return; });
