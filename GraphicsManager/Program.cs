@@ -18,7 +18,8 @@ namespace IngameScript
             Manager.Utilities.Add(new FlightUtilities(tag));
             Manager.Utilities.Add(new GasUtilities(ref Manager.Inventory));
             Manager.Utilities.Add(new PowerUtilities(ref Manager.Inventory));
-            Manager.Utilities.Add(new BlockUtilities());
+            Manager.Utilities.Add(new BlockUtilities(tag));
+            Manager.Utilities.Add(new ThrustUtilities(tag));
             //Manager.Utilities.Add(new WeaponUtilities());
             Manager.Init();
         }

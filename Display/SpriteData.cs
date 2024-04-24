@@ -77,7 +77,7 @@ namespace IngameScript
 
         private static void ApplyBuilder(SpriteData d)
         {
-            if (d.commandID.Contains("list")) return;
+            if (d.commandID.Contains("list")/* || d.Data == "••"*/) return;
             StringBuilder builder = new StringBuilder(d.Data);
             builder.Insert(0, d.Prepend);
             builder.Append(d.Append);

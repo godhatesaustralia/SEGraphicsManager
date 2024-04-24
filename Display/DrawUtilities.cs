@@ -100,7 +100,8 @@ namespace IngameScript
             Font,
             Command,
             Update,
-            UpdateOld,
+            Based,
+            Cringe,
             Prepend,
             Append;
         public readonly char
@@ -124,6 +125,8 @@ namespace IngameScript
             Font = "FONT";
             Command = "CMD";
             Update = "PRIORITY";
+            Based = "BASED";
+            Cringe = "VNLA";
             Prepend = "PREP";
             Append = "APP";
         }

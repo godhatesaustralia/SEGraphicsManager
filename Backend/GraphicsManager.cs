@@ -14,6 +14,7 @@ namespace IngameScript
         public MyGridProgram Program;
         public IMyGridTerminalSystem Terminal;
         public IMyProgrammableBlock Me;
+        public IMyShipController Controller;
 
         public string Tag, GCM, Name;
 
@@ -33,7 +34,7 @@ namespace IngameScript
         private int dPtr, iPtr, // display pointers
             min = 256, fast; // min - frames to wait for echo, fast - determines Priority.Fast
         private double totalRt, RuntimeMS, WorstRun, AverageRun;
-        private bool frozen = false, setupComplete, draw, useCustomDisplays, useLogo;
+        private bool frozen = false, setupComplete, draw, useCustomDisplays, useLogo, isCringe;
         private long Frame, WorstFrame;
         private Priority p;
         #endregion
@@ -56,7 +57,15 @@ namespace IngameScript
                 Name = p.String(GCM, "groupName", "Screen Control");
                 fast = 60 / p.Byte(GCM, "maxDrawPerSecond", 4);
                 useCustomDisplays = p.Bool(GCM, "custom", true);
+                isCringe = p.Bool(GCM, "vanillaFont", false);
                 useLogo = p.Bool(GCM, "logo", false);
+                var ctrl = p.String(GCM, "shipCTRL", "[I]");
+                Terminal.GetBlocksOfType<IMyShipController>(null, b =>
+                {
+                    if ((b.CustomName.Contains(ctrl) || b.IsMainCockpit) && b.IsSameConstructAs(Program.Me))
+                        Controller = b;
+                    return true;
+                });
                 FastDisplays = new List<DisplayBase>();
             }
             else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
@@ -77,24 +86,26 @@ namespace IngameScript
             Program.Runtime.UpdateFrequency |= UpdateFrequency.Update1 | UpdateFrequency.Update10 | UpdateFrequency.Update100;
             setupComplete = false;
             Clear(auto);
+
             if (auto)
             {
                 Frame = WorstFrame = 0;
                 RuntimeMS = WorstRun = AverageRun = totalRt = 0;
-                Commands.Add("!def", (b) => { return; });
-                Commands.Add("!date", (b) => {
-                        b.Data = DateTime.Now.ToString();
+                Commands.Add("!def", b => { return; });
+                Commands.Add("!date", b => {
+                        b.Data = DateTime.Now.Date.Date.ToShortDateString();
                     });
-                Commands.Add("!time", (b) =>
+                Commands.Add("!time", b =>
                 {
                     var time = DateTime.Now.TimeOfDay;
                     b.Data = $"{timeFormat(time.Hours)}:{timeFormat(time.Minutes)}";
                 });
-                Commands.Add("!rt", (b) => b.Data = AverageRun.ToString("0.####"));
+                Commands.Add("!rt", b => b.Data = AverageRun.ToString("0.####"));
                 Inventory.Setup(ref Commands);
                 foreach (UtilityBase utility in Utilities)
                     utility.Setup(ref Commands);
             }
+
             Inventory.Reset(this, Program);
             foreach (UtilityBase utility in Utilities)
                 utility.Reset(this, Program);
@@ -131,10 +142,10 @@ namespace IngameScript
             else
             {
                 var b = DisplayBlocks.First();
-                var d = new LinkedDisplay(b, ref Commands, ref Program, ref Keys);
+                var d = new LinkedDisplay(b, ref Commands, ref Program, ref Keys, isCringe);
                 var p = Priority.None;
                 var st = b.BlockDefinition.SubtypeName;
-                if (useLogo &&  st == "TransparentLCDLarge" || st == "HoloLCDLarge")
+                if (useLogo &&  (st.Contains("LCDLarge") || st == "LargeFullBlockLCDPanel" || st == "LargeTextPanel")) // keen
                 {
                     int c = logos.Count;
                     var l = new CoyLogo(b as IMyTextPanel);
@@ -220,7 +231,14 @@ namespace IngameScript
                             Init(false);
                             break;
                         }
+                    case "vcr":
+                        {
+                            isCringe = !isCringe;
+                            Init(false); 
+                            break;
+                        }
                     case "freeze":
+                    case "toggle":
                         {
                             if (frozen)
                             {
