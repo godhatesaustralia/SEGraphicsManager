@@ -38,6 +38,7 @@ namespace IngameScript
         static public UpdateFrequency uDef = UpdateFrequency.None;
         static public Color dColor = Color.HotPink;
         static public string bsod = "A problem has been detected and Windows has been shut down to prevent damage \r\nto your computer. \r\nUNMOUNTABLE_BOOT_VOLUME \r\nIf this is the first time you've seen this error screen, \r\nrestart your computer. If this screen appears again, follow \r\nthese steps: \r\nCheck to be sure you have adequate disk space. If a driver is \r\nidentified in the Stop message, disable the driver or check \r\nwith the manufacturer for driver updates. Try changing video \r\nadapters. \r\nCheck with your hardware vendor for any BIOS updates. Disable \r\nBIOS memory options such as caching or shadowing. \r\nIf you need to use Safe Mode to remove or disable components, restart \r\nyour computer, press F8 to select Advanced Startup Options, and then \r\nselect Safe Mode. \r\n \r\nTechnical Information: \r\n*** STOP: 0x000000ED(0x80F128D0, 0xC000009C, 0x00000000, 0x00000000) \r\n \r\n";
+
         public static int Next(ref int p, int max)
         {
             if (p < max)
@@ -98,6 +99,7 @@ namespace IngameScript
             Scale,
             Color,
             Font,
+            Format,
             Command,
             Update,
             Based,
@@ -123,6 +125,7 @@ namespace IngameScript
             Scale = "SCALE";
             Color = "COLOR";
             Font = "FONT";
+            Format = "FORMAT";
             Command = "CMD";
             Update = "PRIORITY";
             Based = "BASED";

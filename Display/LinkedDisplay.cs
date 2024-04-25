@@ -181,21 +181,18 @@ namespace IngameScript
                     foreach (var name in nArray)
                     {
                         var spr = $"{Keys.SpriteSection}_{name}";
-                        if (ini.hasSection(spr) && nArray.Contains(name))
+                        if (ini.hasSection(spr) && !Outputs[surf].ContainsKey(name))
                         {
                             SpriteData s = new SpriteData();
                             s.Name = name;
 
-                            if (!noVCR)
+                            if (!noVCR && ini.Bool(spr, Keys.Cringe, false))
                             {
-                                if (ini.Bool(spr, Keys.Cringe, false))
-                                {
-                                    if (Outputs[surf].ContainsKey(s.Name))
-                                        Outputs[surf].Remove(s.Name);
-                                    continue;
-                                }
+                                if (Outputs[surf].ContainsKey(s.Name))
+                                    Outputs[surf].Remove(s.Name);
+                                continue;
                             }
-                            else if (ini.Bool(spr, Keys.Based, false))
+                            else if (noVCR && ini.Bool(spr, Keys.Based, false))
                             {
                                 if (Outputs[surf].ContainsKey(s.Name))
                                     Outputs[surf].Remove(s.Name);
@@ -249,7 +246,7 @@ namespace IngameScript
                                 {
                                     s.uID = dEID + index + Array.IndexOf(nArray, name);
                                     s.commandID = ini.String(spr, Keys.Command, "!def");
-
+                                    s.Format = ini.String(spr, Keys.Format);
                                     if (!Commands.ContainsKey(s.commandID))
                                         throw new Exception($"PARSE FAILURE: sprite {s.Name} on screen {Name} has invalid command {s.commandID}");
 
@@ -271,21 +268,25 @@ namespace IngameScript
                                         if (ini.hasKey(spr, Keys.Append))
                                             s.Append = " " + ini.String(spr, Keys.Append);
                                     }
-                                    s.SetBuilder();
                                 }
+                                s.SetFlags();
                             }
                             s.sprCached = SpriteData.CreateSprite(s, true);
-                            if (!Outputs[surf].ContainsKey(s.Name))
-                                Outputs[surf].Add(s.Name, s);
+                            Outputs[surf].Add(s.Name, s);
                         }
                         else
                         {
                             Default(ref surf);
+                            //throw new Exception($"\n cant find {name}");
                             good = false;
                         }
                     }
                 }
-                else Default(ref surf);
+                else
+                {
+                    Default(ref surf);
+                    return false;
+                }
             }
             //Program.Echo($"surface {surf.DisplayName} LOADED, priority {p}");
             return good;
@@ -296,13 +297,14 @@ namespace IngameScript
             var c = (s.TextureSize - s.SurfaceSize) / 2;
             var r = s.TextureSize / s.SurfaceSize;
             var uh = 20 * r + 0.5f * c;
-            var d = new SpriteData(Color.White, Name, "", uh.X, uh.Y + (c.Y * 0.4f), c.Length() * 0.005275f, align: TextAlignment.LEFT);
+            var d = new SpriteData(Color.White, s.Name, "", uh.X, uh.Y + (c.Y * 0.4f), c.Length() * 0.005275f, align: TextAlignment.LEFT);
             s.ScriptBackgroundColor = Color.Blue;
             d.Data = $"{Name}\nSURFACE {s.Name}\nSCREEN SIZE {s.SurfaceSize}\nTEXTURE SIZE {s.TextureSize}\nPOSITION OF THIS THING {uh}\n\n\n{Lib.bsod}";
             d.FontID = "Monospace";
             d.sprCached = SpriteData.CreateSprite(d, true);
             var f = s.DrawFrame();
-            Outputs[s].Add(Name, d);
+            if (!Outputs.ContainsKey(s))
+                Outputs[s].Add(Name, d);
             f.Dispose();
         }
 
@@ -367,7 +369,7 @@ namespace IngameScript
                 }
             }
             else throw new Exception($" PARSE FAILURE: {Name} cd error {Result.Error} at {Result.LineNo}");
-            p.Dispose();
+            //p.Dispose();
             if (Outputs.Count == 0) return Priority.None;
             if (!w) SetPriority();
 

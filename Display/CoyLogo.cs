@@ -27,7 +27,7 @@ namespace IngameScript
         Dictionary<int, int> alphaDict = new Dictionary<int, int>();
         public Color color;
 
-        public CoyLogo(IMyTextPanel drawingSurface)
+        public CoyLogo(IMyTextPanel drawingSurface, bool f = false)
         {
             this.drawingSurface = drawingSurface;
             var viewport = new RectangleF((drawingSurface.TextureSize - drawingSurface.SurfaceSize) / 2f, drawingSurface.SurfaceSize);
@@ -175,6 +175,13 @@ namespace IngameScript
                         10
                     )
                 };
+            if (f)
+                logoPieces.AddOrInsert(new SpriteGroup
+                (
+                new List<MySprite> {
+                            Sprite("SquareHollow", new Vector2(256, 128), new Vector2(512, 512), 0)
+                    }
+                ), 0);
         }
 
         public void Update(string argument)

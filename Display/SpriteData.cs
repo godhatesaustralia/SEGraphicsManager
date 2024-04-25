@@ -12,7 +12,8 @@ namespace IngameScript
     public class SpriteData
     {
         #region fields
-
+        const string l = "list";
+        bool isList, noFormat;
         public SpriteType Type;
         public TextAlignment Alignment;
         public Action<SpriteData> Command = null;
@@ -28,6 +29,7 @@ namespace IngameScript
             Name,
             Data,
             DataPrev,
+            Format,
             FontID = "White",
             commandID,
             Prepend,
@@ -46,7 +48,7 @@ namespace IngameScript
         {
         }
 
-        public SpriteData(Color color, string name = "", string data = "", float posX = 0, float posY = 0, float ros = float.MinValue,  float szX = 0, float szY = 0, string font = "White", Priority p = Priority.None, SpriteType type = SpriteType.TEXT, TextAlignment align = TextAlignment.CENTER, string command = "", string prepend = "", string append = "")
+        public SpriteData(Color color, string name = "", string data = "", float posX = 0, float posY = 0, float ros = float.MinValue,  float szX = 0, float szY = 0, string font = "White", Priority p = Priority.None, SpriteType type = SpriteType.TEXT, TextAlignment align = TextAlignment.CENTER, string command = "", string prepend = "", string append = "", string format = "")
         {
             uID = -1;
             Color = color;
@@ -69,15 +71,31 @@ namespace IngameScript
             if (Type == Lib.dType)
             {
                 FontID = font;
+                Format = format;
                 Prepend = prepend;
                 Append = append;
-                SetBuilder();
-            }
+                SetFlags();
+            } 
+        }
+        public void SetData(double value, string def = "")
+        {
+            if (isList || noFormat)
+                Data = value.ToString(def);
+
+            else Data = value.ToString(Format);
+        }
+        // variant for tags (string t)
+        public void SetData(double value, string t, string def)
+        {
+            if (isList || noFormat)
+                Data = t + value.ToString(def);
+
+            else Data = t + value.ToString(Format);
         }
 
         private static void ApplyBuilder(SpriteData d)
         {
-            if (d.commandID.Contains("list")/* || d.Data == "••"*/) return;
+            if (d.isList/* || d.Data == "••"*/) return;
             StringBuilder builder = new StringBuilder(d.Data);
             builder.Insert(0, d.Prepend);
             builder.Append(d.Append);
@@ -93,7 +111,17 @@ namespace IngameScript
             return b;
         }
 
-        public void SetBuilder() => Builder = (Prepend != "" || Append != "");          
+        public void SetFlags()
+        {
+            Builder = Prepend != "" || Append != "";
+            isList = commandID.Contains(l);
+            noFormat = Format == "";
+            if (!Builder) return;
+            if (Prepend != null && Prepend.Contains("\n")) 
+                Prepend.Trim();
+            if (Append != null && Append.Contains("\n")) 
+                Append.Trim();
+        }
 
         public static MySprite CreateSprite(SpriteData d, bool start = false)
         {
@@ -121,7 +149,7 @@ namespace IngameScript
                 d.Alignment,
                 MathHelper.ToRadians(d.RorS)
             );
-         
+    
                 return sprite;
             }
         }

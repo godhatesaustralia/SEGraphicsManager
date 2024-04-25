@@ -33,7 +33,9 @@ namespace IngameScript
 
         private int dPtr, iPtr, // display pointers
             min = 256, fast; // min - frames to wait for echo, fast - determines Priority.Fast
+        const int rtMax = 10; // theoretically accurate for update10
         private double totalRt, RuntimeMS, WorstRun, AverageRun;
+        private Queue<double> runtimes = new Queue<double>(rtMax);
         private bool frozen = false, setupComplete, draw, useCustomDisplays, useLogo, isCringe;
         private long Frame, WorstFrame;
         private Priority p;
@@ -49,8 +51,8 @@ namespace IngameScript
             Displays = new List<DisplayBase>();
             Static = new List<DisplayBase>();
             Utilities = new List<UtilityBase>();
-            var p = new iniWrap();
             var result = new MyIniParseResult();
+            var p = new iniWrap();
             if (p.CustomData(Me, out result))
             {
                 Tag = p.String(GCM, "tag", GCM);
@@ -69,6 +71,7 @@ namespace IngameScript
                 FastDisplays = new List<DisplayBase>();
             }
             else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
+            p.Dispose();
         }
 
         public void Clear(bool auto)
@@ -100,12 +103,13 @@ namespace IngameScript
                     var time = DateTime.Now.TimeOfDay;
                     b.Data = $"{timeFormat(time.Hours)}:{timeFormat(time.Minutes)}";
                 });
-                Commands.Add("!rt", b => b.Data = AverageRun.ToString("0.####"));
-                Inventory.Setup(ref Commands);
+                Commands.Add("!rt", b => b.SetData(AverageRun, "0.###"));
+                
                 foreach (UtilityBase utility in Utilities)
                     utility.Setup(ref Commands);
             }
 
+            Inventory.Setup(ref Commands);
             Inventory.Reset(this, Program);
             foreach (UtilityBase utility in Utilities)
                 utility.Reset(this, Program);
@@ -147,13 +151,14 @@ namespace IngameScript
                 var st = b.BlockDefinition.SubtypeName;
                 if (useLogo &&  (st.Contains("LCDLarge") || st == "LargeFullBlockLCDPanel" || st == "LargeTextPanel")) // keen
                 {
+                    var ini = new iniWrap();
                     int c = logos.Count;
-                    var l = new CoyLogo(b as IMyTextPanel);
+                    var l = ini.CustomData(b) ? new CoyLogo(b as IMyTextPanel, ini.Bool(Keys.ScreenSection, "FRAME_L", false)) : new CoyLogo(b as IMyTextPanel);
                     l.SetAnimate();
                     logos.Add(l);
                     p = d.Setup(b, true);
                     logos[c].color = d.logoColor;
-
+                    ini.Dispose();
                 }
                 else p = d.Setup(b);
 
@@ -272,8 +277,8 @@ namespace IngameScript
             }
             if (!setupComplete) return;
 
-            
-            if (Frame % fast == 0)
+            bool fast = (source & UpdateType.Update10) != 0;
+            if (fast)
             {
                 p |= Priority.Fast;
                 foreach (var d in FastDisplays)
@@ -298,10 +303,18 @@ namespace IngameScript
             var rt = Program.Runtime.LastRunTimeMs;
             if (WorstRun < rt) { WorstRun = rt; WorstFrame = Frame; }
             totalRt += rt;
+            if (runtimes.Count == rtMax)
+                runtimes.Dequeue();
+            runtimes.Enqueue(rt);
             if (Frame > min)
             {
-                if ((p & Priority.Fast) != 0)
-                    AverageRun = totalRt / Frame;
+                if (fast)
+                {
+                    AverageRun = 0;
+                    foreach (var qr in runtimes)
+                        AverageRun += qr;
+                    AverageRun /= rtMax;
+                }
                 string n = "";
                 foreach (var d in Displays)
                     n += $"{d.Name}\n";
@@ -312,7 +325,7 @@ namespace IngameScript
                 else r += $"UTILS {iPtr + 1}/{Utilities.Count} - {Utilities[iPtr].Name}";
 
                 r += $"\nRUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun.ToString("0.####")} ms\nWORST - {WorstRun} ms, F{WorstFrame}\n";
-                //r = Inventory.DebugString;
+                //r = Inventory.DebugString; 
                 Program.Echo(r);
             }
         }

@@ -62,6 +62,12 @@ namespace IngameScript
             return (T)this;
         }
 
+        protected void Validate(double v, ref SpriteData d, string def = "")
+        {
+            if (double.IsNaN(v)) d.Data = invalid;
+            else d.SetData(v, def);
+        }
+
         public abstract void GetBlocks();
         public abstract void Update();
         public abstract void Setup(ref Dictionary<string, Action<SpriteData>> commands);
@@ -79,13 +85,12 @@ namespace IngameScript
         List<IMyGasTank>
             HydrogenTanks = new List<IMyGasTank>(),
             OxygenTanks = new List<IMyGasTank>();
-        List<IMyGasGenerator> Gens = new List<IMyGasGenerator> ();
+        List<IMyGasGenerator> Gens = new List<IMyGasGenerator>();
         UseRate Ice;
         ItemInfo<IMyGasGenerator> IceOre;
         const int keen = 5;
         DateTime tsH2;
         double lastH2; // sigh
-        Dictionary<long, int> hTime = new Dictionary<long, int>();
         Info h2, o2;
 
         public GasUtilities(ref InventoryUtilities inv)
@@ -96,14 +101,6 @@ namespace IngameScript
         }
 
         #region UtilityBase
-        public override void Reset(GraphicsManager m, MyGridProgram p)
-        {
-            base.Reset(m, p);
-            hTime.Clear();
-            HydrogenStatus();
-            OxygenStatus();
-            HydrogenTime(0);
-        }
 
         public override void GetBlocks()
         {
@@ -118,14 +115,20 @@ namespace IngameScript
 
         public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
         {           //s fucking hate this, this sucks ass
+
             h2 = new Info(HydrogenStatus);
             o2 = new Info(OxygenStatus);
+            // JIT
+            HydrogenTime();
+            HydrogenStatus();
+            OxygenStatus();
 
             commands.Add("!h2%", b =>
-                b.Data = h2.Data.ToString("#0.#%"));
+                b.SetData(h2.Data, "#0.#%"));
 
             commands.Add("!o2%", b =>
-                b.Data = o2.Data.ToString("#0.#%"));
+                b.SetData(o2.Data, "#0.#%"));
+
             commands.Add("!h2b", b =>
             {
                 if (GCM.justStarted)
@@ -140,16 +143,16 @@ namespace IngameScript
             });
             commands.Add("!h2t", b =>
             {
-                if (GCM.justStarted && !hTime.ContainsKey(b.uID))
-                {
-                    if (b.Data.ToLower() == "sec")
-                        hTime.Add(b.uID, 1);
-                    else if (b.Data.ToLower() == "min")
-                        hTime.Add(b.uID, 2);
-                    else hTime.Add(b.uID, 0);
-                }
-                if (hTime.ContainsKey(b.uID))
-                    b.Data = HydrogenTime(hTime[b.uID]);
+                var t = HydrogenTime();
+                if (t == TimeSpan.Zero)
+                    b.Data = invalid;
+                if (b.Format == "")
+                    if (t.TotalHours >= 1)
+                        b.Data = string.Format("{0,2}h {1,2}m", (long)t.TotalHours, (long)t.Minutes);
+                    else
+                        b.Data = string.Format("{0,2}m {1,2}s", (long)t.TotalMinutes, (long)t.Seconds);
+                else
+                    b.SetData(t.TotalSeconds);
             });
 
             commands.Add("!ice", b =>
@@ -186,8 +189,7 @@ namespace IngameScript
             return amt / total;
         }
 
-
-        string HydrogenTime(int sw)
+        TimeSpan HydrogenTime()
         {
             var ts = DateTime.Now;
             var rate = MathHelperD.Clamp(lastH2 - h2.Data, 1E-50, double.MaxValue) / (ts - tsH2).TotalSeconds;
@@ -195,17 +197,8 @@ namespace IngameScript
             lastH2 = h2.Data;
             tsH2 = ts;
             if (rate < 1E-15 || double.IsNaN(value) || value > 1E5)
-                return invalid;
-            var time = TimeSpan.FromSeconds(value);
-            // stolen
-            if (sw == 0)
-                if (time.TotalHours >= 1)
-                    return string.Format("{0,2}h {1,2}m", (long)time.TotalHours, (long)time.Minutes);
-                else
-                    return string.Format("{0,2}m {1,2}s", (long)time.TotalMinutes, (long)time.Seconds);
-            else if (sw == 1) return time.TotalSeconds.ToString("####");
-            else if (sw == 2) return time.TotalMinutes.ToString();
-            else return invalid;
+                return TimeSpan.Zero;
+            return TimeSpan.FromSeconds(value);
         }
     }
     public class InventoryItem
@@ -288,13 +281,13 @@ namespace IngameScript
 
         public void Update() => quantity = Inventory.ItemQuantity(ref Inventory.InventoryBlocks, Type);
 
-        public override string ToString() => quantity.ToString(Format);
+        public string ToString(bool f = false) => f ? quantity.ToString(Format) : quantity.ToString();
     }
 
     public class ItemInfo<T> : ItemInfo
         where T : IMyTerminalBlock
     {
-        public ItemInfo(string t, string st, InventoryUtilities iu, List<T> l, string f = "") :base(t, st, iu, false, f)
+        public ItemInfo(string t, string st, InventoryUtilities iu, List<T> l, string f = "") : base(t, st, iu, false, f)
         {
             ItemUpdate = () => quantity = Inventory.ItemQuantity(ref l, Type);
         }
@@ -307,8 +300,8 @@ namespace IngameScript
         public static string myObjectBuilder = "MyObjectBuilder";
         public string Section, J = "JIT", DebugString;
         int updateStep = 5, iiPtr;
-        public bool ignoreTanks, vanilla, ignoreGuns;
-        public bool needsUpdate;
+        bool ignoreTanks, vanilla;
+        public bool needsUpdate, ignoreGuns;
         public List<IMyTerminalBlock> InventoryBlocks = new List<IMyTerminalBlock>(), InventoryBlocksNoGuns = new List<IMyTerminalBlock>();
         private Dictionary<long, string[]>
             itemKeys = new Dictionary<long, string[]>(),
@@ -542,9 +535,9 @@ namespace IngameScript
                                         t[i] = "";
                                         continue;
                                     }
-                                    Items.Add(item?.ID, item);
+                                    Items.Add(item.ID, item);
                                 }
-                                catch (Exception e)
+                                catch (Exception) // keen dict problem
                                 { continue; }
                             k[i] = a[1] + cmd + a[2];
                             if (a.Length != 3 && a.Length != 4)
@@ -564,37 +557,19 @@ namespace IngameScript
             else throw new Exception(result.Error);
         }
 
-        void UpdateItemString(long id, ref string data)
+        void UpdateItemString(long id, ref SpriteData d)
         {
             if (!itemKeys.ContainsKey(id))
                 return;
-            //string s = "";
-            //foreach (var key in Items.Keys) s += $"\n{key}";
-            //throw new Exception(s);
-            data = itemTags[id][0] + Items[itemKeys[id][0]].ToString();
-
-            if (itemKeys[id].Length == 1)
-                return;
+            var itm = Items[itemKeys[id][0]];
+            d.SetData(itm.Data, itemTags[id][0], itm.Format);
+            //if (itemKeys[id].Length == 1)
+            //    return;
             for (int i = 1; i < itemKeys[id].Length; i++)
-                data += $"\n{itemTags[id][i]}{Items[itemKeys[id][i]]}";
+                d.Data += $"\n{itemTags[id][i]}{Items[itemKeys[id][i]].ToString(true)}";
         }
 
         #region UtilityBase
-
-        public override void Reset(GraphicsManager m, MyGridProgram p)
-        {
-            base.Reset(m, p);
-            var jitItem = new ItemInfo<IMyTerminalBlock>("Ingot", J, this, InventoryBlocks);
-            var jitR = new UseRate(J);
-            var temp = new Queue<double>();
-            var d = 0d;
-            AddItemGroup(jitSprite.uID, J);
-            UpdateItemString(jitSprite.uID, ref jitSprite.Data);
-            TryGetUseRate(ref jitR, ref jitItem, out d);
-            Items.Remove(J);
-            itemKeys.Remove(jitSprite.uID);
-            itemTags.Remove(jitSprite.uID);
-        }
 
         public override void GetBlocks()
         {
@@ -602,7 +577,6 @@ namespace IngameScript
             InventoryBlocksNoGuns.Clear();
             TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
             {
-
                 bool i = b.HasInventory && b.IsSameConstructAs(Reference);
                 if (ignoreTanks)
                     if (b is IMyGasTank)
@@ -625,8 +599,24 @@ namespace IngameScript
             });
         }
 
+        void JIT()
+        {
+            // JIT
+            var l = new List<IMyTerminalBlock>();
+            var jitItem = new ItemInfo<IMyTerminalBlock>("Ingot", J, this, l);
+            var jitR = new UseRate(J);
+            var d = 0d;
+            AddItemGroup(jitSprite.uID, J);
+            UpdateItemString(jitSprite.uID, ref jitSprite);
+            TryGetUseRate(ref jitR, ref jitItem, out d, l);
+        }
+
         public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
         {
+            JIT();
+
+            itemKeys.Clear();
+            itemTags.Clear();
             Items.Clear();
             var p = new iniWrap();
             if (p.CustomData(Reference))
@@ -637,45 +627,49 @@ namespace IngameScript
                 updateStep = p.Byte(Section, "invStep", 5);
             }
 
-            commands.Add("!item", b =>
+            commands["!item"] = b =>
             {
                 if (GCM.justStarted)
-                    if (b.Data.Contains(cmd))
+                    try 
                     {
-                        b.Data = b.Data.Trim();
-                        var s = b.Data.Split(cmd);
-                        if (!itemKeys.ContainsKey(b.uID))
+                        if (b.Data.Contains(cmd))
                         {
-                            itemKeys.Add(b.uID, new string[] { b.Data });
-                            itemTags.Add(b.uID, new string[] { "" });
+                            b.Data = b.Data.Trim();
+                            var s = b.Data.Split(cmd);
+                            if (!itemKeys.ContainsKey(b.uID) && s.Length >= 2)
+                            {
+                                var i = new ItemInfo(s[0], s[1], this);
+                                {
+                                    if (!Items.ContainsKey(i.ID))
+                                        Items.Add(i.ID, i);
+                                }
+                                itemKeys.Add(b.uID, new string[] { i.ID });
+                            }
                         }
-                        if (!Items.ContainsKey(b.Data))
-                            if (s.Length == 2)
-                                Items.Add(b.Data, new ItemInfo(s[0], s[1], this));
-                            else if (s.Length == 3)
-                                Items.Add(b.Data, new ItemInfo(s[0], s[1], this, f: s[2]));
                     }
+                    catch (Exception)
+                    { throw new Exception($"\nError in data for sprite {b.Name} - invalid item key: {b.Data}."); }
                     else return;
-                UpdateItemString(b.uID, ref b.Data);
-            });
+                b.SetData(Items[itemKeys[b.uID][0]].Data);
+            };
 
-            commands.Add("!itemslist", b =>
+            commands["!itemslist"] = b =>
             {
                 if (GCM.justStarted && b.Data != "")
                 {
                     AddItemGroup(b.uID, b.Data);
                     return;
                 }
-                UpdateItemString(b.uID, ref b.Data);
-            });
+                UpdateItemString(b.uID, ref b);
+            };
 
-            commands.Add("!invdebug", b =>
+            commands["!invdebug"] = b =>
             {
                 if (!GCM.justStarted)
                     return;
                 b.Data = $"INVENTORIES = {InventoryBlocks.Count}\n";
                 b.Data += ignoreGuns ? "WEAPONS NOT COUNTED" : $"NON - WEAPONS = {InventoryBlocksNoGuns.Count}";
-            });
+            };
         }
 
         public override void Update()
@@ -777,17 +771,11 @@ namespace IngameScript
 
         #region UtilityBase
 
-        public override void Reset(GraphicsManager m, MyGridProgram p)
-        {
-            var par = new iniWrap();
-            par.CustomData(m.Me);
-            std = par.String(tag, fmat, "0000");
-            //ctrlName = par.String(tag, ctrl, "[I]");
-            base.Reset(m, p);
-        }
-
         public override void GetBlocks()
         {
+            var par = new iniWrap();
+            par.CustomData(GCM.Me);
+            std = par.String(tag, fmat, "0000");
             TerminalSystem.GetBlocksOfType(JumpDrives, b => b.IsSameConstructAs(Program.Me));
             //TerminalSystem.GetBlocksOfType<IMyShipController>(null, inv =>
             //{
@@ -799,27 +787,35 @@ namespace IngameScript
 
         public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
         {
+
             jump = new Info(JumpCharge);
+            // JIT
+            jump.Update();
+            //GetHorizonAngle();
+            //Accel(true);
+            //GetAlt(MyPlanetElevation.Sealevel);
+            //StoppingDist(true);
+
             commands.Add("!horiz", b =>
-                b.Data = Validate(GetHorizonAngle(), "-#0.##; +#0.##") + "°");
+                 Validate(GetHorizonAngle(), ref b, "-#0.##; +#0.##" + "°"));
 
             commands.Add("!c-alt", b =>
-                b.Data = Validate(GetAlt(MyPlanetElevation.Sealevel), std));
+                Validate(GetAlt(MyPlanetElevation.Sealevel), ref b, std));
 
             commands.Add("!s-alt", b =>
-                b.Data = Validate(GetAlt(MyPlanetElevation.Surface), std));
+                Validate(GetAlt(MyPlanetElevation.Surface), ref b, std));
 
             commands.Add("!stop", b =>
-                b.Data = Validate(StoppingDist(), std, std));
+                Validate(StoppingDist(), ref b, std));
 
-            commands.Add("!accel", b => b.Data = Validate(Accel(), std));
+            commands.Add("!accel", b => Validate(Accel(), ref b, std));
 
             commands.Add("!damp", b =>
             { // this should not be a problem (famous last words)
                 b.Data = GCM.Controller.DampenersOverride ? "ON" : "OFF";
             });
 
-            commands.Add("!jcharge%", b => b.Data = jump.Data.ToString("#0.#%"));
+            commands.Add("!jcharge%", b => b.SetData(jump.Data, "#0.#%"));
 
             commands.Add("!jchargeb", b =>
             {
@@ -837,14 +833,8 @@ namespace IngameScript
 
         #endregion
 
-        string Validate(double v, string f, string o = "••") => !double.IsNaN(v) ? v.ToString(f) : o;
-
         bool GravCheck(out Vector3D grav) //wanted something nice and neat
         {
-            grav = VZed;
-            if (GCM.Controller == null)
-                return false;
-
             grav = GCM.Controller.GetNaturalGravity();
             if (grav == VZed)
                 return false;
@@ -853,8 +843,9 @@ namespace IngameScript
 
         double GetHorizonAngle()
         {
-            var grav = VZed; // Vector3D.Zero         
             if (!GravCheck(out grav))
+                return bad;
+            if (grav == VZed)
                 return bad;
             grav.Normalize();
             return Math.Asin(MathHelper.Clamp(GCM.Controller.WorldMatrix.Forward.Dot(grav), -1, 1));
@@ -862,7 +853,6 @@ namespace IngameScript
 
         double GetAlt(MyPlanetElevation elevation)
         {
-            var grav = VZed; // Vector3D.Zero         
             if (!GravCheck(out grav))
                 return bad;
             var alt = 0d;
@@ -873,18 +863,18 @@ namespace IngameScript
 
         double Accel()
         {
-            double
-                ret = lastAccel;
+            var ret = lastAccel;
             var ts = DateTime.Now;
+            if (GCM.justStarted)
+                return bad;
             var current = GCM.Controller.GetShipVelocities().LinearVelocity;
-            if (!GCM.justStarted)
-            {
-                if (current.Length() < 0.037)
-                    return bad;
-                var mag = (current - lastVel).Length();
-                if (mag > dev)
-                    ret += mag / (ts - accelTS).TotalSeconds;
-            }
+
+            if (current.Length() < 0.037)
+                return bad;
+            var mag = (current - lastVel).Length();
+            if (mag > dev)
+                ret += mag / (ts - accelTS).TotalSeconds;
+
             if (ret > maxAccel) maxAccel = ret;
             lastAccel = ret;
             accelTS = ts;
@@ -946,7 +936,7 @@ namespace IngameScript
         Dictionary<Base6Directions.Direction, IMyThrust[]> dirThrust = new Dictionary<Base6Directions.Direction, IMyThrust[]>();
         Dictionary<Base6Directions.Direction, int> maxThrust = new Dictionary<Base6Directions.Direction, int>();
         Dictionary<long, Base6Directions.Direction> idToDir = new Dictionary<long, Base6Directions.Direction>();
-        Dictionary<long, MyTuple<IMyThrust, float>> singles = new Dictionary<long, MyTuple<IMyThrust, float>>();
+        Dictionary<long, IMyThrust> singles = new Dictionary<long, IMyThrust>();
 
         public ThrustUtilities(string t)
         {
@@ -999,17 +989,37 @@ namespace IngameScript
 
         public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
         {
+            // JIT
+            var l = new List<IMyThrust>();
+            createGroup(ref l, getDir(F));
+            getThrust(getDir(F));
+
             commands.Add("!cirthr%", b =>
             {
                 bool k = singles.ContainsKey(b.uID);
                 if (GCM.justStarted && !k)
-                    foreach (var t in AllThrusters)
+                    GCM.Terminal.GetBlocksOfType<IMyThrust>(null, t =>
+                    {
                         if (t.CustomName.Contains(b.Name))
                         {
-                            singles[b.uID] = MyTuple.Create(t, b.sX);
-                            break;
+                            singles[b.uID] = t;
+                            Lib.GraphStorage[b.uID] = MyTuple.Create(false, b.sX);
                         }
-                b.sX = b.sY = (1 + singles[b.uID].Item1.CurrentThrustPercentage) * singles[b.uID].Item2;
+                        return false;
+                    });
+                b.sX = b.sY = (.625f + singles[b.uID].CurrentThrust / singles[b.uID].MaxThrust) * Lib.GraphStorage[b.uID].Item2;
+            });
+            commands.Add("!curthr%", b =>
+            {
+                bool k = singles.ContainsKey(b.uID);
+                if (GCM.justStarted && !k)
+                    GCM.Terminal.GetBlocksOfType<IMyThrust>(null, t =>
+                    {
+                        if (t.CustomName.Contains(b.Data))
+                            singles[b.uID] = t;
+                        return false;
+                    });
+                b.Data = singles[b.uID].CurrentThrustPercentage.ToString("#0.#%");
             });
             commands.Add("!movethr", b => curThrust(ref b));
             commands.Add("!movethr%", b => curThrust(ref b, true));
@@ -1065,6 +1075,8 @@ namespace IngameScript
         double getThrust(Base6Directions.Direction dir)
         {
             var ret = 0d;
+            if (!dirThrust.ContainsKey(dir))
+                return ret;
             var a = dirThrust[dir];
             for (int i = 0; i < a.Length; i++)
                 ret += a[i].CurrentThrust;
@@ -1072,20 +1084,20 @@ namespace IngameScript
         }
         void curThrust(ref SpriteData b, bool pct = false, bool a = false)
         {
-            var d = -GCM.Controller.MoveIndicator;
-            if (d == Vector3.Zero)
+            var d = -GCM.Controller?.MoveIndicator;
+            if (d == Vector3.Zero || d == null)
             {
                 b.Data = invalid;
                 return;
             }
-            var dir = Base6Directions.GetClosestDirection(ref d);
+            var dir = Base6Directions.GetClosestDirection(d.Value);
             var cur = groups[dir].Data;
             if (pct)
-                b.Data = (cur / maxThrust[dir]).ToString("#0.#%");
+                b.SetData(cur / maxThrust[dir], "#0.#%");
             else if (a)
-                b.Data = (cur / GCM.Controller.CalculateShipMass().TotalMass).ToString("#0.#");
+                b.SetData(cur / GCM.Controller.CalculateShipMass().TotalMass, "#0.#");
             else
-                b.Data = $"{groups[dir].Data}N";
+                b.SetData(groups[dir].Data);
         }
 
     }
@@ -1137,9 +1149,7 @@ namespace IngameScript
             pwr = new Info(Output);
 
             commands.Add("!bcharge%", (b) =>
-            {
-                b.Data = !double.IsNaN(batt.Data) ? batt.Data.ToString("#0.#%") : invalid;
-            });
+                Validate(batt.Data, ref b, "#0.#%"));
 
             commands.Add("!bchargeb", b =>
             {
@@ -1147,17 +1157,17 @@ namespace IngameScript
                     Lib.CreateBarGraph(ref b);
                 Lib.UpdateBarGraph(ref b, batt.Data);
             });
-            commands.Add("!generation%", (b) => b.Data = (pwr.Data / pmax).ToString("#0.#%"));
-            commands.Add("!fuel", b => b.Data = Fuel.ToString());
+            commands.Add("!gridgen%", b => b.SetData(pwr.Data / pmax, "#0.#%"));
+            commands.Add("!fuel", b => b.SetData(Fuel.Data, Fuel.Format));
             commands.Add("!fission", b =>
             {
                 var rate = 0d;
                 if (GCM.justStarted)
                     //if (!Inventory.Items.ContainsKey(U.iID))
                     //    Inventory.Items.Add(U.iID, new ItemInfo<("Ingot", U.iID, Inventory));
-                b.Data = Inventory.TryGetUseRate(ref U, ref Fuel, out rate, Reactors) ? $"{rate:000.0} KG/S" : "0 KG/S";
+                    b.Data = Inventory.TryGetUseRate(ref U, ref Fuel, out rate, Reactors) ? $"{rate:000.0} KG/S" : "0 KG/S";
             });
-
+            commands.Add("!gridcap", b => b.SetData(1 - (pwr.Data / pmax), "#0.#%"));
             commands.Add("!reactorstat", b =>
             {
                 int c = 0, i = 0;
