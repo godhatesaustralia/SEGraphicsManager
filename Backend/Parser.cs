@@ -13,9 +13,10 @@ namespace IngameScript
 {
     public class iniWrap: IDisposable
     {
-        static List<MyIni> IniParsers = new List<MyIni>();
+        public static List<MyIni> IniParsers = new List<MyIni>();
         static int IniCount = 0;
         MyIni myIni;
+        int index;
         string tld = "~";
         MyIniParseResult result;
 
@@ -24,9 +25,9 @@ namespace IngameScript
             ++IniCount;
             if (IniParsers.Count < IniCount)
                 IniParsers.Add(new MyIni());
-
+            
             myIni = IniParsers[IniParsers.Count - 1];
-
+            
             myIni.Clear();
         }
 
