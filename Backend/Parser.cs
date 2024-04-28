@@ -8,39 +8,109 @@ using VRage.Game.ModAPI.Ingame.Utilities;
 using VRageMath;
 using VRage.Input;
 using VRage.Game.GUI.TextPanel;
+using System.Security.Policy;
 
 namespace IngameScript
 {
-    public class iniWrap: IDisposable
+    public class iniWrap : IDisposable
     {
-        public static List<MyIni> IniParsers = new List<MyIni>();
+        static List<MyIni> IniParsers = new List<MyIni>();
+        static List<int> IniUses = new List<int>();
         static int IniCount = 0;
+        static public int total = 0;
+        static public int Count => IniParsers.Count;
         MyIni myIni;
-        int index;
         string tld = "~";
         MyIniParseResult result;
 
         public iniWrap()
         {
             ++IniCount;
+            ++total;
             if (IniParsers.Count < IniCount)
                 IniParsers.Add(new MyIni());
-            
-            myIni = IniParsers[IniParsers.Count - 1];
-            
+            //if (total % 10 == 0)
+            //    IniParsers.Add(new MyIni());
+            myIni = IniParsers[IniCount - 1];
+
             myIni.Clear();
+        }
+
+        public iniWrap(bool reuse)
+        {
+            ++IniCount;
+
+            if (IniParsers.Count < IniCount)
+            {
+                IniParsers.Add(new MyIni());
+                IniUses.Add(0);
+            }
+            //else if (IniUses[IniCount - 1] > 2)
+            //{
+            //    IniParsers[IniParsers.Count - 1] = null;
+            //    IniParsers[IniParsers.Count - 1] = new MyIni();
+            //    IniUses[IniUses.Count - 1] = 0;
+            //}
+            myIni = IniParsers[IniParsers.Count - 1];
+            ++IniUses[IniUses.Count - 1];
+            //myIni = new MyIni();
+            //myIni.Clear();
+        }
+
+        public void Obliterate()
+        {
+            int i = IniParsers.IndexOf(myIni);
+            IniParsers[i] = null;
+            IniParsers[i] = new MyIni();
+            IniUses[i] = 0;
+        }
+
+        public bool ContainsAny
+        {
+            get
+            {
+                var l = new List<string>();
+                myIni.GetSections(l);
+                return l.Count > 0;
+            }
+        }
+
+        public int iniIndex
+        {
+            get
+            {
+                return IniParsers.IndexOf(myIni);
+            }
+        }
+        public string Sections
+        {
+            get
+            {
+                string r = "";
+                List<string> l = new List<string>();
+                myIni.GetSections(l);
+                foreach (var s in l)
+                    r += "\n" + s;
+                return r;
+            }
         }
 
         public bool CustomData(IMyTerminalBlock block, out MyIniParseResult Result)
         {
             var output = myIni.TryParse(block.CustomData, out result);
-            Result = result; 
+            Result = result;
             return output;
         }
 
         public bool CustomData(IMyTerminalBlock block)
         {
             var output = myIni.TryParse(block.CustomData, out result);
+            return output;
+        }
+
+        public bool CustomData(string cd)
+        {
+            var output = myIni.TryParse(cd, out result);
             return output;
         }
 
@@ -101,7 +171,7 @@ namespace IngameScript
             if (a.ToByte(3) != 3)
                 return (TextAlignment)a.ToByte(2);
             else
-               c = a.ToString(c).ToLower();
+                c = a.ToString(c).ToLower();
             switch (c) // oh what the hell
             {
                 case "l":
@@ -115,6 +185,26 @@ namespace IngameScript
                 default:
                     return TextAlignment.CENTER;
             }
+        }
+
+        public bool TryReadVector2(string aSct, string aKey, out float x, out float y, string n = "")
+        {
+            x = y = 0;
+            string s = myIni.Get(aSct, aKey).ToString();
+            if (s == "")
+                return false;
+            var v = s.Split(',');
+            //return false;
+            try
+            {
+                x = float.Parse(v[0].Trim('('));
+                y = float.Parse(v[1].Trim(')'));
+            }
+            catch (Exception)
+            {
+                throw new Exception($"\nError reading {aKey} floats for {aSct} in {n}: \n{v[0]} and {v[1]}");
+            }
+            return true;
         }
 
         //public int Int(string aSct, string aKy, int def = 0)
@@ -137,7 +227,7 @@ namespace IngameScript
             aKy = keymod(aSct, aKy);
             byte r, g, b, a;
             def = myIni.Get(aSct, aKy).ToString(def).ToLower();
-            if (def.Length != 8) 
+            if (def.Length != 8)
                 return Lib.dColor; //safety
             r = Hex(def, 0, 2);
             g = Hex(def, 2, 2);
@@ -158,8 +248,12 @@ namespace IngameScript
         {
             return aSct.Contains(t);
         }
+
+        public override string ToString() => myIni.ToString();
+
         public void Dispose()
         {
+            myIni.Clear();
             IniCount--;
         }
     }

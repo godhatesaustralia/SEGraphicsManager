@@ -16,11 +16,11 @@ namespace IngameScript
             
             Manager.Inventory = new InventoryUtilities(this, tag, new DebugAPI(this));
             Manager.Utilities.Add(new FlightUtilities(tag));
-            Manager.Utilities.Add(new GasUtilities(ref Manager.Inventory));
-            Manager.Utilities.Add(new PowerUtilities(ref Manager.Inventory));
+            Manager.Utilities.Add(new GasUtilities());
+            Manager.Utilities.Add(new PowerUtilities());
             Manager.Utilities.Add(new BlockUtilities(tag));
             Manager.Utilities.Add(new ThrustUtilities(tag));
-            //Manager.Utilities.Add(new WeaponUtilities());
+            //Manager.Utilities.Add(new CoreWeaponUtilities());
             Manager.Init();
         }
 

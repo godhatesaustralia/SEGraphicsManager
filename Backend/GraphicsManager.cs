@@ -18,28 +18,28 @@ namespace IngameScript
 
         public string Tag, GCM, Name;
 
-        Dictionary<string, Action<SpriteData>> Commands;
+        Dictionary<string, Action<SpriteData>> Commands = new Dictionary<string, Action<SpriteData>>();
+        Dictionary<string, bool> inUse = new Dictionary<string, bool>();
         List<DisplayBase> Displays, FastDisplays, Static;
         List<CoyLogo> logos = new List<CoyLogo>();
 
         public List<UtilityBase> Utilities;
         public InventoryUtilities Inventory;
 
-
         HashSet<IMyTerminalBlock> DisplayBlocks = new HashSet<IMyTerminalBlock>();
 
         public IniKeys Keys;
         public bool justStarted => !setupComplete;
        
-        private int dPtr, iPtr, // display pointers
+        int dPtr, iPtr, // display pointers
             min = 256, fast; // min - frames to wait for echo, fast - determines Priority.Fast
         const int rtMax = 10; // theoretically accurate for update10
-        private double totalRt, RuntimeMS, WorstRun, AverageRun;
-        private Queue<double> runtimes = new Queue<double>(rtMax);
-        private bool frozen = false, setupComplete, draw, useCustomDisplays, useLogo, isCringe;
-        private long Frame, WorstFrame;
+        double totalRt, RuntimeMS, WorstRun, AverageRun;
+        Queue<double> runtimes = new Queue<double>(rtMax);
+        bool frozen = false, setupComplete, draw, useCustomDisplays, useLogo, isCringe;
+        long Frame, WorstFrame;
         public long F => Frame;
-        private Priority p;
+        Priority p;
         #endregion
 
         public GraphicsManager(MyGridProgram program, string t)
@@ -48,7 +48,6 @@ namespace IngameScript
             GCM = t;
             Terminal = program.GridTerminalSystem;
             Me = program.Me;
-            Commands = new Dictionary<string, Action<SpriteData>>();
             FastDisplays = new List<DisplayBase>();
             Displays = new List<DisplayBase>();
             Static = new List<DisplayBase>();
@@ -216,7 +215,7 @@ namespace IngameScript
                     l.Update("");
                 if (Frame == min)
                 {
-                    //throw new Exception($"\n{iniWrap.IniParsers.Count}");
+                    //throw new Exception($"\nTOTAL {iniWrap.total} INICOUNT {iniWrap.IniCount} LIST COUNT {iniWrap.Count}");
                     SetPriorities(ref FastDisplays);
                     SetPriorities(ref Displays);
                     foreach (var d in Static)
@@ -332,7 +331,7 @@ namespace IngameScript
                     r += $"INV {Inventory.Pointer}/{Inventory.Count}";
                 else r += $"UTILS {iPtr + 1}/{Utilities.Count} - {Utilities[iPtr].Name}";
 
-                r += $"\nRUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun.ToString("0.####")} ms\nWORST - {WorstRun} ms, F{WorstFrame}\n";
+                r += $"\nRUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun.ToString("0.####")} ms\nWORST - {WorstRun} ms, F{WorstFrame}\nFAILURES {Lib.bsodsTotal}";
                 //r = Inventory.DebugString; 
                 Program.Echo(r);
             }

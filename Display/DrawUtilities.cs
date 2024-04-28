@@ -34,6 +34,7 @@ namespace IngameScript
     {
         static public Dictionary<long, MyTuple<bool, float>> GraphStorage = new Dictionary<long, MyTuple<bool, float>>();
         static public List<Color> lights = new List<Color>();
+        static public int bsodsTotal = 0;
         static public SpriteType dType = SpriteType.TEXT;
         static public UpdateFrequency uDef = UpdateFrequency.None;
         static public Color dColor = Color.HotPink;
@@ -64,7 +65,7 @@ namespace IngameScript
         public static string EncodeSprites(ref LinkedDisplay display)
         // the idea: have this make the requisite SpriteData constructors here bc im too lazy
         // the constructor in question:
-        //   public SpriteData(Color color, string name = "", string data = "", float posX = 0, float posY = 0, float ros = float.MinValue,
+        //   public SpriteData(Color color, string name = "", string value = "", float posX = 0, float posY = 0, float ros = float.MinValue,
         //   float szX = 0, float szY = 0, string font = "White", Priority p = Priority.None, SpriteType type = SpriteType.TEXT,
         //   TextAlignment align = TextAlignment.CENTER, string command = "", string prepend = "", string append = "")
         {

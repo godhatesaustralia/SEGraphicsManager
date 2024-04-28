@@ -93,6 +93,13 @@ namespace IngameScript
             else Data = t + value.ToString(Format);
         }
 
+        public void SetData(string line, bool list = false)
+        {
+            if (list)
+                Data += "\n" + line;
+            else Data = line;
+        }
+
         private static void ApplyBuilder(SpriteData d)
         {
             if (d.isList/* || d.Data == "••"*/) return;

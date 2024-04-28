@@ -132,12 +132,10 @@ namespace IngameScript
 
         bool TryAddSprites(ref IMyTextSurface surf, ref iniWrap ini, ref byte index, out Priority p)
         {
-            // idt the way this works is representative of any kind of good practices
-            // but for better or worse it is kind of the bedrock of this whole script thing
-            // so i'm just going to leave it alone
             string sect;
+            int i = 0;
             p = Priority.None;
-            var good = true;
+            bool good = true;
             if (!isSingleScreen)
                 sect = $"{Keys.ScreenSection}_{index}";
             else
@@ -168,7 +166,7 @@ namespace IngameScript
                     return false;
                 }
                 var nArray = names.Split('\n');
-                for (int i = 0; i < nArray.Length; ++i)
+                for (; i < nArray.Length; i++)
                 {
                     nArray[i] = nArray[i].Trim(Keys.entry);
                     nArray[i] = nArray[i].Trim();
@@ -178,13 +176,13 @@ namespace IngameScript
                 if (nArray.Length > 0)
                 {
                     surf.ContentType = ContentType.SCRIPT;
-                    foreach (var name in nArray)
+                    for (i = 0; i < nArray.Length; i++)
                     {
-                        var spr = $"{Keys.SpriteSection}_{name}";
-                        if (ini.hasSection(spr) && !Outputs[surf].ContainsKey(name))
+                        var spr = $"{Keys.SpriteSection}_{nArray[i]}";
+                        if (ini.hasSection(spr))// && !Outputs[surf].ContainsKey(nArray[i]))
                         {
-                            SpriteData s = new SpriteData();
-                            s.Name = name;
+                            var s = new SpriteData();
+                            s.Name = nArray[i];
 
                             if (!noVCR && ini.Bool(spr, Keys.Cringe, false))
                             {
@@ -204,12 +202,14 @@ namespace IngameScript
                             s.Color = ini.Color(spr, Keys.Color);
 
                             s.Alignment = ini.Alignment(spr, Keys.Align);
-                            readVector2(ref s, ref ini, Keys.Size, spr);
-                            readVector2(ref s, ref ini, Keys.Pos, spr);
+                            if (!ini.TryReadVector2(spr, Keys.Pos, out s.X, out s.Y, Name))
+                                Die(nArray[i]);
+
+                            if (s.Type != Lib.dType && !ini.TryReadVector2(spr, Keys.Size, out s.sX, out s.sY, Name))
+                                Die(nArray[i]);
 
                             if (s.Type != Lib.dType)
                                 s.RorS = ini.Float(spr, Keys.Rotation, 0);
-
                             else
                             {
                                 string
@@ -220,8 +220,8 @@ namespace IngameScript
                                 s.FontID = s.Type == Lib.dType ? ini.String(spr, Keys.Font, def) : "";
                                 if ((s.FontID == "VCR" || s.FontID == "VCRBold") && noVCR)
                                 {
-                                    if (ini.hasKey(spr, vpos))
-                                        readVector2(ref s, ref ini, vpos, spr);
+                                    if (ini.hasKey(spr, vpos) && !ini.TryReadVector2(spr, vpos, out s.X, out s.Y, Name))
+                                        Die(nArray[i]);
                                     s.FontID = def;
                                     if (ini.hasKey(spr, vscl))
                                         s.RorS = ini.Float(spr, vscl, 1);
@@ -244,7 +244,7 @@ namespace IngameScript
                             {
                                 if (s.Priority != Priority.None && s.commandID != "")
                                 {
-                                    s.uID = dEID + index + Array.IndexOf(nArray, name);
+                                    s.uID = dEID +  index + i;
                                     s.commandID = ini.String(spr, Keys.Command, "!def");
                                     s.Format = ini.String(spr, Keys.Format);
                                     if (!Commands.ContainsKey(s.commandID))
@@ -272,12 +272,11 @@ namespace IngameScript
                                 s.SetFlags();
                             }
                             s.sprCached = SpriteData.CreateSprite(s, true);
-                            Outputs[surf].Add(s.Name, s);
+                            Outputs[surf][s.Name] = s;
                         }
                         else
                         {
                             Default(ref surf);
-                            //throw new Exception($"\n cant find {name}");
                             good = false;
                         }
                     }
@@ -292,8 +291,14 @@ namespace IngameScript
             return good;
         }
 
+        private void Die(string n)
+        {
+            throw new Exception("\nNO KEY FOUND ON " + n + " ON SCREEN " + Name);
+        }
+
         private void Default(ref IMyTextSurface s)
         {
+            Lib.bsodsTotal++;
             var c = (s.TextureSize - s.SurfaceSize) / 2;
             var r = s.TextureSize / s.SurfaceSize;
             var uh = 20 * r + 0.5f * c;
@@ -308,37 +313,16 @@ namespace IngameScript
             f.Dispose();
         }
 
-        private void readVector2(ref SpriteData sprite, ref iniWrap ini, string key, string nametag)
-        {
-            var pos = ini.String(nametag, key).Split(',');
-            try
-            {
-                if (key == Keys.Pos || key == Keys.Pos + m_vn)
-                {
-                    sprite.X = float.Parse(pos.First().Trim(Keys.vectorL));
-                    sprite.Y = float.Parse(pos.Last().Trim(Keys.vectorR));
-                }
-
-                else if (key == Keys.Size && sprite.Type != Lib.dType)
-                {
-                    sprite.sX = float.Parse(pos.First().Trim(Keys.vectorL));
-                    sprite.sY = float.Parse(pos.Last().Trim(Keys.vectorR));
-                }
-            }
-            catch (Exception)
-            {
-                throw new Exception($"\nError reading {key.ToLower()} floats for {Name}:{sprite.Name}.");
-            }
-        }
-
         public override Priority Setup(IMyTerminalBlock block, bool w = false)
         {
-            iniWrap p = new iniWrap();
+            var p = new iniWrap();
             byte index = 0;
             MyIniParseResult Result;
             Priority ret, pri = ret = Priority.None;
             if (p.CustomData(block, out Result))
             {
+                if (!p.ContainsAny)
+                    p.CustomData(block);
                 if (block is IMyTextSurface)
                 {
                     var DisplayBlock = (IMyTextSurface)block;
@@ -351,8 +335,7 @@ namespace IngameScript
                 {
                     var DisplayBlock = (IMyTextSurfaceProvider)block;
                     var SurfaceCount = DisplayBlock.SurfaceCount;
-
-                    for (index = 0; index < SurfaceCount; ++index)
+                    for (index = 0; index < SurfaceCount; index++)
                     {
                         if (!p.hasSection($"{Keys.ScreenSection}_{index}"))
                             continue;
@@ -367,6 +350,7 @@ namespace IngameScript
                         ret |= pri;
                     }
                 }
+                p.Dispose();
             }
             else throw new Exception($" PARSE FAILURE: {Name} cd error {Result.Error} at {Result.LineNo}");
             //p.Dispose();
@@ -388,11 +372,13 @@ namespace IngameScript
         }
         public override void Update(ref Priority p)
         {
-
+            IMyTextSurface k = Outputs.First().Key;
             if (!isEnabled) return;
+
             foreach (var display in Outputs)
                 if ((Refresh[display.Key] & p) != 0)
                 {
+                    k = display.Key;
                     bool changed = false;
                     foreach (var n in display.Value.Keys)
                         if (CommandUsers[display.Key].Contains(n))
