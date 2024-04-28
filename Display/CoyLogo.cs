@@ -183,7 +183,7 @@ namespace IngameScript
                 logoPieces.Add(new SpriteGroup(
                         new List<MySprite>
                         {
-                            new MySprite(SpriteType.TEXT, "COYOTE ORBITAL", new Vector2(256, 464), null, color, vcr ? "VCRBold" : "White", rotation: (vcr ? 1.5f : 2.25f))
+                            new MySprite(SpriteType.TEXT, "COYOTE ORBITAL", new Vector2(256, 432), null, color, vcr ? "VCRBold" : "White", rotation: (vcr ? 1.125f : 2.25f))
                         },
                         10,
                         10

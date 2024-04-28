@@ -29,70 +29,9 @@ namespace IngameScript
             ++total;
             if (IniParsers.Count < IniCount)
                 IniParsers.Add(new MyIni());
-            //if (total % 10 == 0)
-            //    IniParsers.Add(new MyIni());
             myIni = IniParsers[IniCount - 1];
 
             myIni.Clear();
-        }
-
-        public iniWrap(bool reuse)
-        {
-            ++IniCount;
-
-            if (IniParsers.Count < IniCount)
-            {
-                IniParsers.Add(new MyIni());
-                IniUses.Add(0);
-            }
-            //else if (IniUses[IniCount - 1] > 2)
-            //{
-            //    IniParsers[IniParsers.Count - 1] = null;
-            //    IniParsers[IniParsers.Count - 1] = new MyIni();
-            //    IniUses[IniUses.Count - 1] = 0;
-            //}
-            myIni = IniParsers[IniParsers.Count - 1];
-            ++IniUses[IniUses.Count - 1];
-            //myIni = new MyIni();
-            //myIni.Clear();
-        }
-
-        public void Obliterate()
-        {
-            int i = IniParsers.IndexOf(myIni);
-            IniParsers[i] = null;
-            IniParsers[i] = new MyIni();
-            IniUses[i] = 0;
-        }
-
-        public bool ContainsAny
-        {
-            get
-            {
-                var l = new List<string>();
-                myIni.GetSections(l);
-                return l.Count > 0;
-            }
-        }
-
-        public int iniIndex
-        {
-            get
-            {
-                return IniParsers.IndexOf(myIni);
-            }
-        }
-        public string Sections
-        {
-            get
-            {
-                string r = "";
-                List<string> l = new List<string>();
-                myIni.GetSections(l);
-                foreach (var s in l)
-                    r += "\n" + s;
-                return r;
-            }
         }
 
         public bool CustomData(IMyTerminalBlock block, out MyIniParseResult Result)
@@ -105,12 +44,6 @@ namespace IngameScript
         public bool CustomData(IMyTerminalBlock block)
         {
             var output = myIni.TryParse(block.CustomData, out result);
-            return output;
-        }
-
-        public bool CustomData(string cd)
-        {
-            var output = myIni.TryParse(cd, out result);
             return output;
         }
 
@@ -235,11 +168,11 @@ namespace IngameScript
             a = Hex(def, 6, 2);
             return new Color(r, g, b, a);
         }
-        private byte Hex(string input, int start, int length)
+        byte Hex(string input, int start, int length)
         {
             return Convert.ToByte(input.Substring(start, length), 16);
         }
-        private string keymod(string s, string k)
+        string keymod(string s, string k)
         {
             k = !myIni.ContainsKey(s, k.ToLower()) ? k : k.ToLower();
             return k;

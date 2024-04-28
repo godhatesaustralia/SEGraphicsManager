@@ -321,8 +321,6 @@ namespace IngameScript
             Priority ret, pri = ret = Priority.None;
             if (p.CustomData(block, out Result))
             {
-                if (!p.ContainsAny)
-                    p.CustomData(block);
                 if (block is IMyTextSurface)
                 {
                     var DisplayBlock = (IMyTextSurface)block;

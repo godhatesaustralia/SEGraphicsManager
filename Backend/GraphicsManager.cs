@@ -73,23 +73,24 @@ namespace IngameScript
                 else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
         }
 
-        public void Clear(bool auto)
+        public void Clear(bool full)
         {
             dPtr = -1;
-            if (auto) Commands.Clear();
+            iniWrap.total = 0;
+            if (full) Commands.Clear();
             Displays.Clear();
             DisplayBlocks.Clear();
             Lib.GraphStorage.Clear();
             Lib.lights.Clear();
         }
 
-        public void Init(bool auto = true)
+        public void Init(bool full = true)
         {
             Program.Runtime.UpdateFrequency |= UpdateFrequency.Update1 | UpdateFrequency.Update10 | UpdateFrequency.Update100;
             setupComplete = false;
-            Clear(auto);
+            Clear(full);
 
-            if (auto)
+            if (full)
             {
                 Frame = WorstFrame = 0;
                 RuntimeMS = WorstRun = AverageRun = totalRt = 0;
@@ -123,7 +124,7 @@ namespace IngameScript
 
             RunSetup();
 
-            if (auto && DisplayBlocks.Count <= 6)
+            if (full && DisplayBlocks.Count <= 6)
                 while (DisplayBlocks.Count > 0)
                     RunSetup();
         }
@@ -158,7 +159,16 @@ namespace IngameScript
                     using (var ini = new iniWrap())
                     {
                         int c = logos.Count;
-                        var l = ini.CustomData(b) ? new CoyLogo(b as IMyTextPanel, ini.Bool(Keys.ScreenSection, "FRAME_L", false)) : new CoyLogo(b as IMyTextPanel);
+                        CoyLogo l;
+                        if (ini.CustomData(b))
+                        {
+                            l = new CoyLogo(
+                                b as IMyTextPanel,
+                                ini.Bool(Keys.ScreenSection, "FRAME_L", false),
+                                ini.Bool(Keys.ScreenSection, "TEXT_L", false),
+                                ini.Bool(Keys.ScreenSection, "VCR_L", false));
+                        }
+                        else l = new CoyLogo(b as IMyTextPanel);
                         l.SetAnimate();
                         logos.Add(l);
                         p = d.Setup(b, true);
@@ -223,7 +233,7 @@ namespace IngameScript
                     draw = true;
                     p |= Priority.Once;
                 }
-
+                Program.Echo($"RUNS - {Frame}\nPARSE CYCLES - {iniWrap.total}\nMYINI INSTANCES - {iniWrap.Count}\nFAILURES - {Lib.bsodsTotal}");
             }
 
             if (arg != "")
@@ -331,7 +341,7 @@ namespace IngameScript
                     r += $"INV {Inventory.Pointer}/{Inventory.Count}";
                 else r += $"UTILS {iPtr + 1}/{Utilities.Count} - {Utilities[iPtr].Name}";
 
-                r += $"\nRUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun.ToString("0.####")} ms\nWORST - {WorstRun} ms, F{WorstFrame}\nFAILURES {Lib.bsodsTotal}";
+                r += $"\nRUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun.ToString("0.####")} ms\nWORST - {WorstRun} ms, F{WorstFrame}";
                 //r = Inventory.DebugString; 
                 Program.Echo(r);
             }
