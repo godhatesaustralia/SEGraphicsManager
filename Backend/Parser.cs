@@ -69,11 +69,12 @@ namespace IngameScript
         //    return myIni.Get(aSct, aKy).ToDouble(def);
         //}
 
-        public byte Byte(string aSct, string aKy, byte def = 2)
+        public int Int(string aSct, string aKy, int def = 0)
         {
             aKy = keymod(aSct, aKy);
-            return myIni.Get(aSct, aKy).ToByte(def);
+            return myIni.Get(aSct, aKy).ToInt32(def);
         }
+
         public SpriteType Type(string aSct, string aKy)
         {
             aKy = keymod(aSct, aKy);
@@ -140,11 +141,6 @@ namespace IngameScript
             return true;
         }
 
-        //public int Int(string aSct, string aKy, int def = 0)
-        //{
-        //    aKy = keymod(aSct, aKy);
-        //    return myIni.Get(aSct, aKy).ToInt32(def);
-        //}
         public bool Bool(string aSct, string aKy, bool def = false)
         {
             aKy = keymod(aSct, aKy);
@@ -161,7 +157,7 @@ namespace IngameScript
             byte r, g, b, a;
             def = myIni.Get(aSct, aKy).ToString(def).ToLower();
             if (def.Length != 8)
-                return Lib.dColor; //safety
+                return Lib.PINK; //safety
             r = Hex(def, 0, 2);
             g = Hex(def, 2, 2);
             b = Hex(def, 4, 2);

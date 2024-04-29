@@ -14,27 +14,31 @@ namespace IngameScript
 
         List<SpriteGroup> logoPieces;
         IMyTextPanel drawingSurface;
-        private float yOffset;
-        int groupIndex = 0;
+        float yOffset;
 
-        bool animate = false;
-        bool reverse = false;
-        static string
+        int
+            ticks = 0,
+            step = 0,
+            updateFrequency = 1,
+            lastStartStep = 0,
+            groupIndex = 0;
+
+        bool 
+            animate = false,
+            reverse = false;
+        // char save (maybe)
+        static readonly string
             SQS = "SquareSimple",
             RGT = "RightTriangle",
             TRI = "Triangle";
 
-        int ticks = 0;
-        int step = 0;
-        int updateFrequency = 1;
-        int lastStartStep = 0;
         Dictionary<int, int> alphaDict = new Dictionary<int, int>();
         public Color color;
 
-        public CoyLogo(IMyTextPanel drawingSurface, bool f = false, bool txt = false, bool vcr = false)
+        public CoyLogo(IMyTextPanel surface, bool f = false, bool txt = false, bool vcr = false)
         {
-            this.drawingSurface = drawingSurface;
-            var viewport = new RectangleF((drawingSurface.TextureSize - drawingSurface.SurfaceSize) / 2f, drawingSurface.SurfaceSize);
+            drawingSurface = surface;
+            var viewport = new RectangleF((surface.TextureSize - surface.SurfaceSize) / 2f, surface.SurfaceSize);
             yOffset = viewport.Center.Y / 2;
 
                 logoPieces = new List<SpriteGroup> {
@@ -197,7 +201,7 @@ namespace IngameScript
                 ), 0);
         }
 
-        public void Update(string argument)
+        public void Update()
         {
             if (!animate)
             {
@@ -219,7 +223,7 @@ namespace IngameScript
                 return;
             }
 
-            //Check if the next group of sprites should begin animating
+            //Check if the next group of list should begin animating
             int nextStep = -1;
             if (reverse && groupIndex != 0)
             {
@@ -291,7 +295,7 @@ namespace IngameScript
             alphaDict.Clear();
         }
 
-        private void Animate()
+        void Animate()
         {
             var frame = drawingSurface.DrawFrame();
             //var v = new Vector2(256, 256);
@@ -299,14 +303,14 @@ namespace IngameScript
 
             for (int i = 0; i <= groupIndex; i++)
             {
-                var spriteGroup = logoPieces[i];
+                var sGroup = logoPieces[i];
 
-                var newAlpha = Math.Min(255, alphaDict[i] + (int)Math.Ceiling(255 / (double)spriteGroup.steps));
+                var newAlpha = Math.Min(255, alphaDict[i] + (int)Math.Ceiling(255 / (double)sGroup.steps));
                 alphaDict[i] = newAlpha;
                 
-                for (int j = 0; j < spriteGroup.sprites.Count; j++)
+                for (int j = 0; j < sGroup.sprites.Count; j++)
                 {
-                    var sprite = spriteGroup.sprites[j];
+                    var sprite = sGroup.sprites[j];
                     sprite.Color = newAlpha == 255 ? color: AlphaColor(newAlpha);
                     frame.Add(sprite);
                 }
@@ -315,12 +319,12 @@ namespace IngameScript
             frame.Dispose();
         }
 
-        private Color AlphaColor(float na)
+        Color AlphaColor(float na)
         {
             return new Color(color.R / na, color.G / na, color.B / na, na);
         }
 
-        private void AnimateReverse()
+        void AnimateReverse()
         {
             var frame = drawingSurface.DrawFrame();
             for (int i = logoPieces.Count - 1; i >= 0; i--)
@@ -330,11 +334,11 @@ namespace IngameScript
                     continue;
                 }
 
-                var spriteGroup = logoPieces[i];
+                var sGroup = logoPieces[i];
                 var newAlpha = 255;
                 if (i >= groupIndex)
                 {
-                    newAlpha = Math.Max(0, alphaDict[i] - (int)Math.Ceiling(255 / (double)spriteGroup.steps));
+                    newAlpha = Math.Max(0, alphaDict[i] - (int)Math.Ceiling(255 / (double)sGroup.steps));
                     alphaDict[i] = newAlpha;
                 }
 
@@ -344,9 +348,9 @@ namespace IngameScript
                     continue;
                 }
 
-                for (int j = 0; j < spriteGroup.sprites.Count; j++)
+                for (int j = 0; j < sGroup.sprites.Count; j++)
                 {
-                    var sprite = spriteGroup.sprites[j];
+                    var sprite = sGroup.sprites[j];
                     sprite.Color = newAlpha == 255 ? color : AlphaColor(newAlpha);
 
                     frame.Add(sprite);
@@ -356,10 +360,10 @@ namespace IngameScript
             frame.Dispose();
         }
 
-        private MySprite Sprite(string shape, Vector2 pos, Vector2 size, float rotation)
+        MySprite Sprite(string shape, Vector2 pos, Vector2 size, float rotation)
         {
             //TODO: figure out how to rotate for wide LCD
-            pos.Y = pos.Y + yOffset;
+            pos.Y += yOffset;
             return new MySprite(SpriteType.TEXTURE, shape, pos, size, color, rotation: rotation, alignment: TextAlignment.CENTER);
         }
     }
@@ -369,11 +373,11 @@ namespace IngameScript
         public List<MySprite> sprites;
         public int steps; //how many steps to fade in
         public int offset; //steps to wait to start animating after previous sprite group
-        public SpriteGroup(List<MySprite> sprites, int steps = 4, int offset = 2)
+        public SpriteGroup(List<MySprite> list, int s = 4, int o = 2)
         {
-            this.sprites = sprites;
-            this.steps = steps;
-            this.offset = offset;
+            sprites = list;
+            steps = s;
+            offset = o;
         }
     }
 }

@@ -30,17 +30,17 @@ using VRageRender;
 
 namespace IngameScript
 {
-    public static class Lib
+    static public class Lib
     {
         static public Dictionary<long, MyTuple<bool, float>> GraphStorage = new Dictionary<long, MyTuple<bool, float>>();
         static public List<Color> lights = new List<Color>();
         static public int bsodsTotal = 0;
-        static public SpriteType dType = SpriteType.TEXT;
-        static public UpdateFrequency uDef = UpdateFrequency.None;
-        static public Color dColor = Color.HotPink;
+        static public SpriteType TXT = SpriteType.TEXT;
+        static public UpdateFrequency NONE = UpdateFrequency.None;
+        static public Color PINK = Color.HotPink;
         static public string bsod = "A problem has been detected and Windows has been shut down to prevent damage \r\nto your computer. \r\nUNMOUNTABLE_BOOT_VOLUME \r\nIf this is the first time you've seen this error screen, \r\nrestart your computer. If this screen appears again, follow \r\nthese steps: \r\nCheck to be sure you have adequate disk space. If a driver is \r\nidentified in the Stop message, disable the driver or check \r\nwith the manufacturer for driver updates. Try changing video \r\nadapters. \r\nCheck with your hardware vendor for any BIOS updates. Disable \r\nBIOS memory options such as caching or shadowing. \r\nIf you need to use Safe Mode to remove or disable components, restart \r\nyour computer, press F8 to select Advanced Startup Options, and then \r\nselect Safe Mode. \r\n \r\nTechnical Information: \r\n*** STOP: 0x000000ED(0x80F128D0, 0xC000009C, 0x00000000, 0x00000000) \r\n \r\n";
 
-        public static int Next(ref int p, int max)
+        static public int Next(ref int p, int max)
         {
             if (p < max)
                 p++;
@@ -48,21 +48,21 @@ namespace IngameScript
                 p = 0;
             return p;
         }
-        public static void CreateBarGraph(ref SpriteData d)
+        static public void CreateBarGraph(ref SpriteData d)
         {
             if (GraphStorage.ContainsKey(d.uID))
                 return;
             bool horizontal = d.sX > d.sY || d.sX == d.sY;
             GraphStorage.Add(d.uID, new MyTuple<bool, float>(horizontal, horizontal ? d.sX : d.sY));
         }
-        public static void UpdateBarGraph(ref SpriteData data, double pctData)
+        static public void UpdateBarGraph(ref SpriteData data, double pctData)
         {
             var graph = GraphStorage[data.uID];
             if (graph.Item1) data.sX = Convert.ToSingle(pctData) * graph.Item2;
             else data.sY = Convert.ToSingle(pctData) * graph.Item2;
         }
 
-        public static string EncodeSprites(ref LinkedDisplay display)
+        static public string EncodeSprites(ref LinkedDisplay display)
         // the idea: have this make the requisite SpriteData constructors here bc im too lazy
         // the constructor in question:
         //   public SpriteData(Color color, string name = "", string value = "", float posX = 0, float posY = 0, float ros = float.MinValue,
@@ -84,57 +84,6 @@ namespace IngameScript
 
     }
 
-    public class IniKeys //avoid allocating new memory for every display (i hope). just seems less dumb.
-    {
-        public string
-            ScreenSection,
-            SpriteSection,
-            List,
-            Logo,
-            Type,
-            Data,
-            Size,
-            Align,
-            Pos,
-            Rotation,
-            Scale,
-            Color,
-            Font,
-            Format,
-            Command,
-            Update,
-            Based,
-            Cringe,
-            Prepend,
-            Append;
-        public readonly char
-            vectorL = '(',
-            vectorR = ')',
-            entry = '>';
-        public void ResetKeys() //yes...this is questionable...
-        {
-            ScreenSection = "SECT_SCREEN";
-            SpriteSection = "SECT_SPRITE";
-            List = "LIST";
-            Logo = "LOGO";
-            Type = "TYPE";
-            Data = "DATA";
-            Size = "SIZE";
-            Align = "ALIGN";
-            Pos = "POS";
-            Rotation = "ROTATION";
-            Scale = "SCALE";
-            Color = "COLOR";
-            Font = "FONT";
-            Format = "FORMAT";
-            Command = "CMD";
-            Update = "PRIORITY";
-            Based = "BASED";
-            Cringe = "VNLA";
-            Prepend = "PREP";
-            Append = "APP";
-        }
-    }
     public class DebugAPI
     {
         public readonly bool ModDetected;

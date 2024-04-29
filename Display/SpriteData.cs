@@ -55,7 +55,7 @@ namespace IngameScript
             Type = type;
             Name = name;    
             Data = data;
-            if (Type != Lib.dType)
+            if (Type != Lib.TXT)
             {
                 sX = szX;
                 sY = szY;
@@ -64,11 +64,11 @@ namespace IngameScript
             X = posX;
             Y = posY;
             if (RorS == float.MinValue)
-                RorS = Type == Lib.dType ? 1 : 0; 
+                RorS = Type == Lib.TXT ? 1 : 0; 
             else RorS = ros;
             Priority = p; //NONE = 0,  high (every 10) = 1, low = 2
             commandID = command;
-            if (Type == Lib.dType)
+            if (Type == Lib.TXT)
             {
                 FontID = font;
                 Format = format;
@@ -136,7 +136,7 @@ namespace IngameScript
                 return d.sprCached;
             else
             {
-                var sprite = d.Type == Lib.dType ? new MySprite(
+                var sprite = d.Type == Lib.TXT ? new MySprite(
                 d.Type,
                 d.Data,
                 new Vector2(d.X, d.Y),

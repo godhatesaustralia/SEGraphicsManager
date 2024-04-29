@@ -572,7 +572,7 @@ namespace IngameScript
                 ignoreTanks = p.Bool(Section, "ignoreTanks", true);
                 vanilla = p.Bool(Section, "nilla", false);
                 ignoreGuns = vanilla & p.Bool(Section, "nogunz", true);
-                updateStep = p.Byte(Section, "invStep", 5);
+                updateStep = p.Int(Section, "invStep", 17);
             }
             base.Reset(manager, program);
         }
@@ -741,13 +741,11 @@ namespace IngameScript
 
     public class FlightUtilities : UtilityBase
     {
-        //public IMyShipController Controller;
         List<IMyJumpDrive> JumpDrives = new List<IMyJumpDrive>();
         double lastDist, maxDist, lastAccel, maxAccel;
         const double dev = 0.01;
         readonly string tag, ctrl, fmat;
         string std;
-        //public string ctrlName;
         DateTime stopTS, accelTS; // fuck you
         Vector3D VZed = Vector3D.Zero, lastVel, grav;
         Info jump;
@@ -768,12 +766,6 @@ namespace IngameScript
                 p.CustomData(GCM.Me);
                 std = p.String(tag, fmat, "0000");
                 TerminalSystem.GetBlocksOfType(JumpDrives, b => b.IsSameConstructAs(Program.Me));
-                //TerminalSystem.GetBlocksOfType<IMyShipController>(null, inv =>
-                //{
-                //    if ((inv.CustomName.Contains(ctrlName) || inv.IsMainCockpit) && inv.IsSameConstructAs(Program.Me))
-                //        Controller = inv;
-                //    return true;
-                //});
             }
         }
 
@@ -783,10 +775,10 @@ namespace IngameScript
             jump = new Info("jd%", JumpCharge);
             // JIT
             jump.Update();
-            //GetHorizonAngle();
-            //Accel(true);
-            //GetAlt(MyPlanetElevation.Sealevel);
-            //StoppingDist(true);
+            GetHorizonAngle();
+            Accel();
+            GetAlt(MyPlanetElevation.Sealevel);
+            StoppingDist();
 
             commands.Add("!horiz", b =>
                  Validate(GetHorizonAngle(), ref b, "-#0.##; +#0.##" + "°"));
@@ -820,6 +812,7 @@ namespace IngameScript
 
         public override void Update()
         {
+
             jump.Update();
         }
 
@@ -900,9 +893,9 @@ namespace IngameScript
 
         double JumpCharge()
         {
+            if (JumpDrives.Count == 0) return 0f;
             float charge, max = 0f;
             charge = max;
-            if (JumpDrives.Count == 0) return 0f;
             for (int i = 0; i < JumpDrives.Count; i++)
             {
                 //if (JumpDrives[i] == null) continue;
@@ -1193,6 +1186,11 @@ namespace IngameScript
             return sum;
 
         }
+    }
+
+    public class WeaponUtilities// : UtilityBase
+    {
+     
     }
 
     // TODO: THIS SYSTEM IS ASS

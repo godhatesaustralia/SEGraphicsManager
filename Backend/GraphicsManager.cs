@@ -10,7 +10,8 @@ namespace IngameScript
     public class GraphicsManager
     {
         #region fields
-
+        // the important ones
+        // pinkie swear to not modify externally
         public MyGridProgram Program;
         public IMyGridTerminalSystem Terminal;
         public IMyProgrammableBlock Me;
@@ -23,16 +24,15 @@ namespace IngameScript
         List<DisplayBase> Displays, FastDisplays, Static;
         List<CoyLogo> logos = new List<CoyLogo>();
 
-        public List<UtilityBase> Utilities;
-        public InventoryUtilities Inventory;
+        List<UtilityBase> Utilities;
+        InventoryUtilities Inventory;
 
         HashSet<IMyTerminalBlock> DisplayBlocks = new HashSet<IMyTerminalBlock>();
 
-        public IniKeys Keys;
         public bool justStarted => !setupComplete;
        
         int dPtr, iPtr, // display pointers
-            min = 256, fast; // min - frames to wait for echo, fast - determines Priority.Fast
+            min, fast; // min - frames to wait for echo, fast - determines Priority.Fast
         const int rtMax = 10; // theoretically accurate for update10
         double totalRt, RuntimeMS, WorstRun, AverageRun;
         Queue<double> runtimes = new Queue<double>(rtMax);
@@ -52,13 +52,15 @@ namespace IngameScript
             Displays = new List<DisplayBase>();
             Static = new List<DisplayBase>();
             Utilities = new List<UtilityBase>();
+            Inventory = new InventoryUtilities(program, t, new DebugAPI(program));
             var result = new MyIniParseResult();
             using (var p = new iniWrap())
                 if (p.CustomData(Me, out result))
                 {
                     Tag = p.String(GCM, "tag", GCM);
                     Name = p.String(GCM, "groupName", "Screen Control");
-                    fast = 60 / p.Byte(GCM, "maxDrawPerSecond", 4);
+                    fast = 60 / p.Int(GCM, "maxDrawPerSecond", 4);
+                    min = p.Int(GCM, "minFrame", 256);
                     useCustomDisplays = p.Bool(GCM, "custom", true);
                     isCringe = p.Bool(GCM, "vanillaFont", false);
                     useLogo = p.Bool(GCM, "logo", false);
@@ -73,7 +75,7 @@ namespace IngameScript
                 else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
         }
 
-        public void Clear(bool full)
+        void Clear(bool full)
         {
             dPtr = -1;
             iniWrap.total = 0;
@@ -83,6 +85,8 @@ namespace IngameScript
             Lib.GraphStorage.Clear();
             Lib.lights.Clear();
         }
+
+        public void AddUtil(UtilityBase b) => Utilities.Add(b);
 
         public void Init(bool full = true)
         {
@@ -128,15 +132,15 @@ namespace IngameScript
                 while (DisplayBlocks.Count > 0)
                     RunSetup();
         }
-        private string timeFormat(int num) => num < 10 ? $"0{num}" : $"{num}";
-        private void UpdateTimes()
+        string timeFormat(int num) => num < 10 ? $"0{num}" : $"{num}";
+        void UpdateTimes()
         {
             RuntimeMS += Program.Runtime.TimeSinceLastRun.TotalMilliseconds;
             //RuntimeMSRounded = (long)RuntimeMS;
             Frame++;
         }
 
-        private void RunSetup()
+        void RunSetup()
         {
             if (DisplayBlocks.Count == 0)
             {
@@ -151,7 +155,7 @@ namespace IngameScript
             else
             {
                 var b = DisplayBlocks.First();
-                var d = new LinkedDisplay(b, ref Commands, ref Program, ref Keys, isCringe);
+                var d = new LinkedDisplay(b, ref Commands, ref Program, isCringe);
                 var p = Priority.None;
                 var st = b.BlockDefinition.SubtypeName;
                 if (useLogo && (st.Contains("LCDLarge") || st == "LargeFullBlockLCDPanel" || st == "LargeTextPanel")) // keen
@@ -186,9 +190,8 @@ namespace IngameScript
             }
         }
 
-        private void GetDisplays()
+        void GetDisplays()
         {
-            Keys.ResetKeys(); // lol. lmao
             var g = Terminal.GetBlockGroupWithName(Tag + " " + Name);
             if (g == null)
                 throw new Exception($"Block group not found. Script is looking for \"{Tag} {Name}\".");
@@ -197,14 +200,14 @@ namespace IngameScript
             DisplayBlocks = l.ToHashSet();
         }
 
-        private void Wipe(ref List<DisplayBase> ds)
+        void Wipe(ref List<DisplayBase> ds)
         {
             if (ds.Count > 0)
                 foreach (var d in ds)
                     d.Reset();
         }
 
-        private void SetPriorities(ref List<DisplayBase> ds)
+        void SetPriorities(ref List<DisplayBase> ds)
         {
             if (ds.Count > 0)
                 foreach (var d in ds)
@@ -222,7 +225,7 @@ namespace IngameScript
             {
                 draw = false;
                 foreach (var l in logos)
-                    l.Update("");
+                    l.Update();
                 if (Frame == min)
                 {
                     //throw new Exception($"\nTOTAL {iniWrap.total} INICOUNT {iniWrap.IniCount} LIST COUNT {iniWrap.Count}");
@@ -247,6 +250,7 @@ namespace IngameScript
                             break;
                         }
                     case "reset":
+                    case "update":
                         {
                             Init(false);
                             break;
@@ -268,7 +272,7 @@ namespace IngameScript
                             }
                             else
                             {
-                                Program.Runtime.UpdateFrequency = Lib.uDef;
+                                Program.Runtime.UpdateFrequency = Lib.NONE;
                                 frozen = true;
                                 break;
                             }
@@ -284,7 +288,7 @@ namespace IngameScript
                             Wipe(ref Displays);
                             Wipe(ref Static);
                             Program.Echo("All displays wiped, ready to restart.");
-                            Program.Runtime.UpdateFrequency = Lib.uDef;
+                            Program.Runtime.UpdateFrequency = Lib.NONE;
                             return;
                         }
                     default: { break; }

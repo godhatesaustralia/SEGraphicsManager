@@ -91,7 +91,7 @@ namespace IngameScript
                 frame.Add(data.sprCached);
                 return;
             }
-            //Program.helm.CustomData += $"\n{s.dType}, \n{s.Data}, \n{s.Size}, \n{s.Position}, \n{s.dColor}, \n{s.Alignment}\n";
+            //Program.helm.CustomData += $"\n{s.TXT}, \n{s.Data}, \n{s.Size}, \n{s.Position}, \n{s.PINK}, \n{s.Alignment}\n";
             frame.Add(SpriteData.CreateSprite(data));
         }
 
@@ -99,22 +99,21 @@ namespace IngameScript
 
     public class LinkedDisplay : DisplayBase
     {
-        readonly IniKeys Keys;
         readonly IMyFunctionalBlock Host;
         bool isEnabled => Host?.Enabled ?? true;
         bool isSingleScreen, noVCR;
+        // m_lg is suffix for logo keys; m_vn is suffix for vanilla option keys
         const string m_lg = "_L", m_vn = "_V";
 
         public Color logoColor = Color.White;
 
-        public LinkedDisplay(IMyTerminalBlock block, ref Dictionary<string, Action<SpriteData>> commandsDict, ref MyGridProgram program, ref IniKeys keys, bool cringe) : base(block)
+        public LinkedDisplay(IMyTerminalBlock block, ref Dictionary<string, Action<SpriteData>> commandsDict, ref MyGridProgram program, bool cringe) : base(block)
         {
             Commands = commandsDict;
             CommandUsers = new Dictionary<IMyTextSurface, HashSet<string>>();
             Refresh = new Dictionary<IMyTextSurface, Priority>();
             Outputs = new Dictionary<IMyTextSurface, Dictionary<string, SpriteData>>();
             Program = program;
-            Keys = keys;
             noVCR = cringe;
             IMyFunctionalBlock f = block as IMyFunctionalBlock;
             if (f != null)
@@ -129,8 +128,12 @@ namespace IngameScript
         // [Custom Data Formatting]
         // ...
         // read the pdf u moron. u absolute buffooon
-
-        bool TryAddSprites(ref IMyTextSurface surf, ref iniWrap ini, ref byte index, out Priority p)
+        
+        // if you're someone else reading this...below method basically is part of my first EVER attempt
+        // to write some original code for SE. so it;s not good :/. it's a messy piece of shit but it is also
+        // the bedrock of this whole thing and it at least tries to be reasonable. this would probably
+        // get obliterated on a server but i really still don't know what im doing
+        bool TryParseSprites(ref IMyTextSurface surf, ref iniWrap ini, ref byte index, out Priority p)
         {
             string sect;
             int i = 0;
@@ -140,7 +143,7 @@ namespace IngameScript
                 sect = $"{Keys.ScreenSection}_{index}";
             else
                 sect = Keys.ScreenSection;
-            //Program.Echo(sect);
+
             CommandUsers.Add(surf, new HashSet<string>());
             if (!ini.hasSection(sect))
                 return false;
@@ -168,7 +171,7 @@ namespace IngameScript
                 var nArray = names.Split('\n');
                 for (; i < nArray.Length; i++)
                 {
-                    nArray[i] = nArray[i].Trim(Keys.entry);
+                    nArray[i] = nArray[i].Trim('>');
                     nArray[i] = nArray[i].Trim();
                     //Program.Echo(nArray[i]); 
                 }
@@ -205,10 +208,10 @@ namespace IngameScript
                             if (!ini.TryReadVector2(spr, Keys.Pos, out s.X, out s.Y, Name))
                                 Die(nArray[i]);
 
-                            if (s.Type != Lib.dType && !ini.TryReadVector2(spr, Keys.Size, out s.sX, out s.sY, Name))
+                            if (s.Type != Lib.TXT && !ini.TryReadVector2(spr, Keys.Size, out s.sX, out s.sY, Name))
                                 Die(nArray[i]);
 
-                            if (s.Type != Lib.dType)
+                            if (s.Type != Lib.TXT)
                                 s.RorS = ini.Float(spr, Keys.Rotation, 0);
                             else
                             {
@@ -217,7 +220,7 @@ namespace IngameScript
                                     vpos = Keys.Pos + m_vn,
                                     vscl = Keys.Scale + m_vn;
 
-                                s.FontID = s.Type == Lib.dType ? ini.String(spr, Keys.Font, def) : "";
+                                s.FontID = s.Type == Lib.TXT ? ini.String(spr, Keys.Font, def) : "";
                                 if ((s.FontID == "VCR" || s.FontID == "VCRBold") && noVCR)
                                 {
                                     if (ini.hasKey(spr, vpos) && !ini.TryReadVector2(spr, vpos, out s.X, out s.Y, Name))
@@ -237,7 +240,7 @@ namespace IngameScript
                                     s.RorS = ini.Float(spr, Keys.Rotation, 0);
                             }
 
-                            s.Priority = (Priority)ini.Byte(spr, Keys.Update, 0);
+                            s.Priority = (Priority)ini.Int(spr, Keys.Update, 0);
                             p |= s.Priority;
 
                             if (ini.hasKey(spr, Keys.Command) && s.Priority != 0)
@@ -287,16 +290,16 @@ namespace IngameScript
                     return false;
                 }
             }
-            //Program.Echo($"surface {surf.DisplayName} LOADED, priority {p}");
             return good;
         }
 
-        private void Die(string n)
+        void Die(string n)
         {
             throw new Exception("\nNO KEY FOUND ON " + n + " ON SCREEN " + Name);
         }
 
-        private void Default(ref IMyTextSurface s)
+        // TODO - better error reporting
+        void Default(ref IMyTextSurface s)
         {
             Lib.bsodsTotal++;
             var c = (s.TextureSize - s.SurfaceSize) / 2;
@@ -325,7 +328,7 @@ namespace IngameScript
                 {
                     var DisplayBlock = (IMyTextSurface)block;
                     Outputs.Add(DisplayBlock, new Dictionary<string, SpriteData>());
-                    if (TryAddSprites(ref DisplayBlock, ref p, ref index, out pri))
+                    if (TryParseSprites(ref DisplayBlock, ref p, ref index, out pri))
                         Refresh.Add(DisplayBlock, pri);
                     ret = pri;
                 }
@@ -341,7 +344,7 @@ namespace IngameScript
                         if (!Outputs.ContainsKey(surface))
                             Outputs.Add(surface, new Dictionary<string, SpriteData>());
 
-                        if (TryAddSprites(ref surface, ref p, ref index, out pri))
+                        if (TryParseSprites(ref surface, ref p, ref index, out pri))
                             Refresh.Add(surface, pri);
                         else
                             Refresh.Add(surface, Priority.None);

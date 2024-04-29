@@ -4,6 +4,31 @@ using System.Collections.Generic;
 
 namespace IngameScript
 {
+    static public class Keys
+    {
+        static public readonly string
+             ScreenSection = "SECT_SCREEN",
+             SpriteSection = "SECT_SPRITE",
+             List = "LIST",
+             Logo = "LOGO",
+             Type = "TYPE",
+             Data = "DATA",
+             Size = "SIZE",
+             Align = "ALIGN",
+             Pos = "POS",
+             Rotation = "ROTATION",
+             Scale = "SCALE",
+             Color = "COLOR",
+             Font = "FONT",
+             Format = "FORMAT",
+             Command = "CMD",
+             Update = "PRIORITY",
+             Based = "BASED",
+             Cringe = "VNLA",
+             Prepend = "PREP",
+             Append = "APP";
+    }
+
     partial class Program : MyGridProgram
     {
         GraphicsManager Manager;
@@ -12,14 +37,13 @@ namespace IngameScript
         {
             CoyLogo.program = this;
             Manager = new GraphicsManager(this, tag);
-            Manager.Keys = new IniKeys();
-            
-            Manager.Inventory = new InventoryUtilities(this, tag, new DebugAPI(this));
-            Manager.Utilities.Add(new FlightUtilities(tag));
-            Manager.Utilities.Add(new GasUtilities());
-            Manager.Utilities.Add(new PowerUtilities());
-            Manager.Utilities.Add(new BlockUtilities(tag));
-            Manager.Utilities.Add(new ThrustUtilities(tag));
+
+            Manager.AddUtil(new FlightUtilities(tag));
+            Manager.AddUtil(new GasUtilities());
+            Manager.AddUtil(new PowerUtilities());
+            Manager.AddUtil(new BlockUtilities(tag));
+            Manager.AddUtil(new ThrustUtilities(tag));
+
             //Manager.Utilities.Add(new CoreWeaponUtilities());
             Manager.Init();
         }
@@ -27,8 +51,6 @@ namespace IngameScript
         public void Main(string argument, UpdateType updateSource)
         {
                 Manager.Update(argument, updateSource);
-
-
         }
     }
 }
