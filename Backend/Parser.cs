@@ -47,12 +47,12 @@ namespace IngameScript
             return output;
         }
 
-        public bool hasSection(string aSct)
+        public bool HasSection(string aSct)
         {
             return myIni.ContainsSection(aSct);
         }
 
-        public bool hasKey(string aSct, string aKy)
+        public bool HasKey(string aSct, string aKy)
         {
             aKy = keymod(aSct, aKy);
             return myIni.ContainsKey(aSct, aKy);

@@ -9,7 +9,7 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Backend", "Backend\Backend.
 EndProject
 Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Display", "Display\Display.shproj", "{C5477161-F854-436B-A478-E9DD4696ABA5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Preset", "Preset\Preset.csproj", "{08552E5B-4F9B-4F0C-8E14-11C0A8755B28}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NameFixerThing", "NameFixerThing\NameFixerThing.csproj", "{A4A157A6-3290-4682-99CC-CF3C2A8CD30A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -18,8 +18,8 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{8C13D670-DC24-46E3-95E5-BFC21816FB32}.Debug|x64.ActiveCfg = Debug|x64
 		{8C13D670-DC24-46E3-95E5-BFC21816FB32}.Debug|x64.Build.0 = Debug|x64
-		{08552E5B-4F9B-4F0C-8E14-11C0A8755B28}.Debug|x64.ActiveCfg = Debug|x64
-		{08552E5B-4F9B-4F0C-8E14-11C0A8755B28}.Debug|x64.Build.0 = Debug|x64
+		{A4A157A6-3290-4682-99CC-CF3C2A8CD30A}.Debug|x64.ActiveCfg = Debug|x64
+		{A4A157A6-3290-4682-99CC-CF3C2A8CD30A}.Debug|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -28,8 +28,6 @@ Global
 		SolutionGuid = {77EE969D-E83B-4095-8EFC-D5873E576707}
 	EndGlobalSection
 	GlobalSection(SharedMSBuildProjectFiles) = preSolution
-		Backend\Backend.projitems*{08552e5b-4f9b-4f0c-8e14-11c0a8755b28}*SharedItemsImports = 4
-		Display\Display.projitems*{08552e5b-4f9b-4f0c-8e14-11c0a8755b28}*SharedItemsImports = 4
 		Backend\Backend.projitems*{8c13d670-dc24-46e3-95e5-bfc21816fb32}*SharedItemsImports = 4
 		Display\Display.projitems*{8c13d670-dc24-46e3-95e5-bfc21816fb32}*SharedItemsImports = 4
 		Display\Display.projitems*{c5477161-f854-436b-a478-e9dd4696aba5}*SharedItemsImports = 13

@@ -1,4 +1,5 @@
-﻿using Sandbox.ModAPI.Ingame;
+﻿using Microsoft.VisualBasic;
+using Sandbox.ModAPI.Ingame;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -19,11 +20,12 @@ namespace IngameScript
 
         public string Tag, GCM, Name;
 
-        Dictionary<string, Action<SpriteData>> Commands = new Dictionary<string, Action<SpriteData>>();
+        public Dictionary<string, Action<SpriteData>> Commands = new Dictionary<string, Action<SpriteData>>();
         Dictionary<string, bool> inUse = new Dictionary<string, bool>();
-        List<DisplayBase> Displays, FastDisplays, Static;
+        Dictionary<string, Display> _displaysMaster = new Dictionary<string, Display>();
+        List<Display> Displays, FastDisplays, Static;
         List<CoyLogo> logos = new List<CoyLogo>();
-
+        MyCommandLine _cmd = new MyCommandLine();
         List<UtilityBase> Utilities;
         InventoryUtilities Inventory;
 
@@ -32,11 +34,11 @@ namespace IngameScript
         public bool justStarted => !setupComplete;
        
         int dPtr, iPtr, // display pointers
-            min, fast; // min - frames to wait for echo, fast - determines Priority.Fast
+            min, fast; // min - frames to wait for echo, fast - determines BlockRefresh.Fast
         const int rtMax = 10; // theoretically accurate for update10
         double totalRt, RuntimeMS, WorstRun, AverageRun;
         Queue<double> runtimes = new Queue<double>(rtMax);
-        bool frozen = false, setupComplete, draw, useCustomDisplays, useLogo, isCringe;
+        bool frozen = false, setupComplete, draw, useLogo, isCringe;
         long Frame, WorstFrame;
         public long F => Frame;
         Priority p;
@@ -48,11 +50,12 @@ namespace IngameScript
             GCM = t;
             Terminal = program.GridTerminalSystem;
             Me = program.Me;
-            FastDisplays = new List<DisplayBase>();
-            Displays = new List<DisplayBase>();
-            Static = new List<DisplayBase>();
+            FastDisplays = new List<Display>();
+            Displays = new List<Display>();
+            Static = new List<Display>();
             Utilities = new List<UtilityBase>();
-            Inventory = new InventoryUtilities(program, t, new DebugAPI(program));
+            Inventory = new InventoryUtilities(t, new DebugAPI(program));
+
             var result = new MyIniParseResult();
             using (var p = new iniWrap())
                 if (p.CustomData(Me, out result))
@@ -61,7 +64,6 @@ namespace IngameScript
                     Name = p.String(GCM, "groupName", "Screen Control");
                     fast = 60 / p.Int(GCM, "maxDrawPerSecond", 4);
                     min = p.Int(GCM, "minFrame", 256);
-                    useCustomDisplays = p.Bool(GCM, "custom", true);
                     isCringe = p.Bool(GCM, "vanillaFont", false);
                     useLogo = p.Bool(GCM, "logo", false);
                     var ctrl = p.String(GCM, "shipCTRL", "[I]");
@@ -82,8 +84,9 @@ namespace IngameScript
             if (full) Commands.Clear();
             Displays.Clear();
             DisplayBlocks.Clear();
+            _displaysMaster.Clear();
+            _cmd.Clear();
             Lib.GraphStorage.Clear();
-            Lib.lights.Clear();
         }
 
         public void AddUtil(UtilityBase b) => Utilities.Add(b);
@@ -93,7 +96,8 @@ namespace IngameScript
             Program.Runtime.UpdateFrequency |= UpdateFrequency.Update1 | UpdateFrequency.Update10 | UpdateFrequency.Update100;
             setupComplete = false;
             Clear(full);
-
+            if (Me.CubeGrid.IsStatic) // lazy hack bullshit
+                Utilities.Remove(Utilities.Find(b => b is FlightUtilities));
             if (full)
             {
                 Frame = WorstFrame = 0;
@@ -122,10 +126,13 @@ namespace IngameScript
 
             Inventory.Reset(this, Program);
             Inventory.Setup(ref Commands);
-
-            if (useCustomDisplays)
-                GetDisplays();
-
+            
+            var g = Terminal.GetBlockGroupWithName(Tag + " " + Name);
+            if (g == null)
+                throw new Exception($"Block group not found. Script is looking for \"{Tag} {Name}\".");
+            var l = new List<IMyTerminalBlock>();
+            g.GetBlocks(l);
+            DisplayBlocks = l.ToHashSet();
             RunSetup();
 
             if (full && DisplayBlocks.Count <= 6)
@@ -133,12 +140,6 @@ namespace IngameScript
                     RunSetup();
         }
         string timeFormat(int num) => num < 10 ? $"0{num}" : $"{num}";
-        void UpdateTimes()
-        {
-            RuntimeMS += Program.Runtime.TimeSinceLastRun.TotalMilliseconds;
-            //RuntimeMSRounded = (long)RuntimeMS;
-            Frame++;
-        }
 
         void RunSetup()
         {
@@ -155,7 +156,7 @@ namespace IngameScript
             else
             {
                 var b = DisplayBlocks.First();
-                var d = new LinkedDisplay(b, ref Commands, ref Program, isCringe);
+                var d = new Display(b, this, isCringe);
                 var p = Priority.None;
                 var st = b.BlockDefinition.SubtypeName;
                 if (useLogo && (st.Contains("LCDLarge") || st == "LargeFullBlockLCDPanel" || st == "LargeTextPanel")) // keen
@@ -168,9 +169,9 @@ namespace IngameScript
                         {
                             l = new CoyLogo(
                                 b as IMyTextPanel,
-                                ini.Bool(Keys.ScreenSection, "FRAME_L", false),
-                                ini.Bool(Keys.ScreenSection, "TEXT_L", false),
-                                ini.Bool(Keys.ScreenSection, "VCR_L", false));
+                                ini.Bool(Keys.SurfaceSection, "FRAME_L", false),
+                                ini.Bool(Keys.SurfaceSection, "TEXT_L", false),
+                                ini.Bool(Keys.SurfaceSection, "VCR_L", false));
                         }
                         else l = new CoyLogo(b as IMyTextPanel);
                         l.SetAnimate();
@@ -185,29 +186,19 @@ namespace IngameScript
                 else if ((p & Priority.Normal) != 0)
                     Displays.Add(d);
                 else Static.Add(d);
-
+                _displaysMaster[d.Name] = d; // crossing my fingers
                 DisplayBlocks.Remove(b);
             }
         }
 
-        void GetDisplays()
-        {
-            var g = Terminal.GetBlockGroupWithName(Tag + " " + Name);
-            if (g == null)
-                throw new Exception($"Block group not found. Script is looking for \"{Tag} {Name}\".");
-            var l = new List<IMyTerminalBlock>();
-            g.GetBlocks(l);
-            DisplayBlocks = l.ToHashSet();
-        }
-
-        void Wipe(ref List<DisplayBase> ds)
+        void Wipe(ref List<Display> ds)
         {
             if (ds.Count > 0)
                 foreach (var d in ds)
                     d.Reset();
         }
 
-        void SetPriorities(ref List<DisplayBase> ds)
+        void SetPriorities(ref List<Display> ds)
         {
             if (ds.Count > 0)
                 foreach (var d in ds)
@@ -217,7 +208,14 @@ namespace IngameScript
 
         public void Update(string arg, UpdateType source)
         {
-            UpdateTimes();
+            RuntimeMS += Program.Runtime.TimeSinceLastRun.TotalMilliseconds;
+            Frame++;
+            var rt = Program.Runtime.LastRunTimeMs;
+            if (WorstRun < rt) { WorstRun = rt; WorstFrame = Frame; }
+            totalRt += rt;
+            if (runtimes.Count == rtMax)
+                runtimes.Dequeue();
+            runtimes.Enqueue(rt);
             if (!setupComplete)
                 RunSetup();
             p = Priority.Normal;
@@ -236,13 +234,17 @@ namespace IngameScript
                     draw = true;
                     p |= Priority.Once;
                 }
-                Program.Echo($"RUNS - {Frame}\nPARSE CYCLES - {iniWrap.total}\nMYINI INSTANCES - {iniWrap.Count}\nFAILURES - {Lib.bsodsTotal}");
+                Program.Echo($"RUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun:0.####} ms\nPARSE CYCLES - {iniWrap.total}\nMYINI INSTANCES - {iniWrap.Count}\nFAILURES - {Lib.bsodsTotal}");
             }
 
-            if (arg != "")
+            if (arg != "" && _cmd.TryParse(arg.ToLower()))
             {
                 arg = arg.ToLower();
-                switch (arg)
+                if (_displaysMaster.ContainsKey(_cmd.Argument(0)))
+                {
+
+                }
+                switch (_cmd.Argument(0))
                 {
                     case "restart":
                         {
@@ -293,6 +295,7 @@ namespace IngameScript
                         }
                     default: { break; }
                 }
+                _cmd.Clear();
             }
             if (!setupComplete) return;
 
@@ -320,13 +323,6 @@ namespace IngameScript
                 draw = iPtr == 0;
             }
 
-            var rt = Program.Runtime.LastRunTimeMs;
-            if (WorstRun < rt) { WorstRun = rt; WorstFrame = Frame; }
-            totalRt += rt;
-            if (runtimes.Count == rtMax)
-                runtimes.Dequeue();
-            runtimes.Enqueue(rt);
-
             if (Frame > min)
             {
                 if (fast)
@@ -336,16 +332,13 @@ namespace IngameScript
                         AverageRun += qr;
                     AverageRun /= rtMax;
                 }
-                string n = "";
-                foreach (var d in Displays)
-                    n += $"{d.Name}\n";
                 string r = "[[GRAPHICS MANAGER]]\n\n";
-                if (draw) r += $"DRAWING DISPLAY {dPtr + 1}/{Displays.Count}";
+                if (draw) r += $"DRAWING DISPLAY {dPtr + 1}/{Displays.Count}\n{Displays[dPtr].Name}.";
                 else if (Inventory.needsUpdate)
                     r += $"INV {Inventory.Pointer}/{Inventory.Count}";
                 else r += $"UTILS {iPtr + 1}/{Utilities.Count} - {Utilities[iPtr].Name}";
 
-                r += $"\nRUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun.ToString("0.####")} ms\nWORST - {WorstRun} ms, F{WorstFrame}";
+                r += $"\nRUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun:0.####} ms\nWORST - {WorstRun} ms, F{WorstFrame}";
                 //r = Inventory.DebugString; 
                 Program.Echo(r);
             }

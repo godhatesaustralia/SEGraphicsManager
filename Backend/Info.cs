@@ -290,8 +290,8 @@ namespace IngameScript
         public static string myObjectBuilder = "MyObjectBuilder", J = "JIT";
         public string Section, DebugString;   
         int updateStep = 5, ibPtr;
-        bool ignoreTanks, vanilla;
-        public bool needsUpdate, ignoreGuns;
+        bool ignoreTanks, ignoreGuns, ignoreSMConnectors, vanilla;
+        public bool needsUpdate;
         List<IMyTerminalBlock> InventoryBlocks = new List<IMyTerminalBlock>();
         public int Count => InventoryBlocks.Count;
         Dictionary<long, string[]>
@@ -304,7 +304,7 @@ namespace IngameScript
         DebugAPI Debug;
         public int Pointer => ibPtr + 1;
 
-        public InventoryUtilities(MyGridProgram program, string s, DebugAPI api = null)
+        public InventoryUtilities(string s, DebugAPI api = null)
         {
             Section = s;
             Debug = api;
@@ -501,7 +501,7 @@ namespace IngameScript
             {
                 MyIniParseResult result;
                 if (p.CustomData(GCM.Me, out result))
-                    if (p.hasKey(Section, key))
+                    if (p.HasKey(Section, key))
                     {
                         var s = p.String(Section, key).Split('\n');
                         if (s.Length > 0)
@@ -569,8 +569,9 @@ namespace IngameScript
             using (var p = new iniWrap())
             if (p.CustomData(manager.Me))
             {
-                ignoreTanks = p.Bool(Section, "ignoreTanks", true);
                 vanilla = p.Bool(Section, "nilla", false);
+                ignoreTanks = p.Bool(Section, "ignoreTanks", true);
+                ignoreSMConnectors = p.Bool(Section, "ignoreSMC", true);
                 ignoreGuns = vanilla & p.Bool(Section, "nogunz", true);
                 updateStep = p.Int(Section, "invStep", 17);
             }
@@ -587,6 +588,8 @@ namespace IngameScript
                 if (ignoreTanks && b is IMyGasTank)
                     return false;
                 if (ignoreGuns && b is IMyUserControllableGun)
+                    return false;
+                if (ignoreSMConnectors && b is IMyShipConnector && b.WorldVolume.Radius <= 0.5)
                     return false;
                 if (b.HasInventory && b.IsSameConstructAs(GCM.Me))
                     InventoryBlocks.Add(b);
@@ -848,14 +851,17 @@ namespace IngameScript
 
         double Accel()
         {
-            var ret = lastAccel;
+            var ret = 0d;
             var ts = DateTime.Now;
             if (GCM.justStarted)
                 return bad;
             var current = GCM.Controller.GetShipVelocities().LinearVelocity;
 
             if (current.Length() < 0.037)
+            {
+                lastAccel = 0;
                 return bad;
+            }
             var mag = (current - lastVel).Length();
             if (mag > dev)
                 ret += mag / (ts - accelTS).TotalSeconds;
@@ -1190,7 +1196,9 @@ namespace IngameScript
 
     public class WeaponUtilities// : UtilityBase
     {
-     
+        Dictionary<long, string[]> wpnTags = new Dictionary<long, string[]>();
+        Dictionary<long, Info> wpnData = new Dictionary<long, Info>(); // sprite uid to cached gun stats
+        Dictionary<long, IMyUserControllableGun> wpns = new Dictionary<long, IMyUserControllableGun>(); // eid to gun
     }
 
     // TODO: THIS SYSTEM IS ASS

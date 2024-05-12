@@ -30,11 +30,9 @@ namespace IngameScript
             Runtime.UpdateFrequency = UpdateFrequency.Update100;
             Manager = new GraphicsManager(this, s);
             // NO TOUCH DISPLAY ;)
-            Manager.Keys = new Keys();
-            Manager.Inventory = new InventoryUtilities(this, s);
-            Manager.Utilities.Add(new GasUtilities(ref Manager.Inventory));
-            Manager.Utilities.Add(new FlightUtilities(s));
-            Manager.Utilities.Add(new PowerUtilities(ref Manager.Inventory));
+            Manager.AddUtil(new GasUtilities());
+            Manager.AddUtil(new FlightUtilities(s));
+            Manager.AddUtil(new PowerUtilities());
             Manager.Init();
         }
         public void Main(string argument, UpdateType updateSource)

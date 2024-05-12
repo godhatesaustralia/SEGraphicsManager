@@ -7,8 +7,11 @@ namespace IngameScript
     static public class Keys
     {
         static public readonly string
-             ScreenSection = "SECT_SCREEN",
-             SpriteSection = "SECT_SPRITE",
+             SurfaceSection = "SURFACE",
+             ScreenSection = "SCREEN_",
+             SpriteSection = "SPRITE_", // always named, so just bake in the underscore 
+             Cycle = "CYCLE",
+             ScreenList = "SCREENS",
              List = "LIST",
              Logo = "LOGO",
              Type = "TYPE",
@@ -42,7 +45,7 @@ namespace IngameScript
             Manager.AddUtil(new GasUtilities());
             Manager.AddUtil(new PowerUtilities());
             Manager.AddUtil(new BlockUtilities(tag));
-            Manager.AddUtil(new ThrustUtilities(tag));
+            //Manager.AddUtil(new ThrustUtilities(tag));
 
             //Manager.Utilities.Add(new CoreWeaponUtilities());
             Manager.Init();

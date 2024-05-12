@@ -33,7 +33,6 @@ namespace IngameScript
     static public class Lib
     {
         static public Dictionary<long, MyTuple<bool, float>> GraphStorage = new Dictionary<long, MyTuple<bool, float>>();
-        static public List<Color> lights = new List<Color>();
         static public int bsodsTotal = 0;
         static public SpriteType TXT = SpriteType.TEXT;
         static public UpdateFrequency NONE = UpdateFrequency.None;
@@ -62,25 +61,25 @@ namespace IngameScript
             else data.sY = Convert.ToSingle(pctData) * graph.Item2;
         }
 
-        static public string EncodeSprites(ref LinkedDisplay display)
+        //static public string EncodeSprites(ref Display display)
         // the idea: have this make the requisite SpriteData constructors here bc im too lazy
         // the constructor in question:
         //   public SpriteData(Color color, string name = "", string value = "", float posX = 0, float posY = 0, float ros = float.MinValue,
-        //   float szX = 0, float szY = 0, string font = "White", Priority p = Priority.None, SpriteType type = SpriteType.TEXT,
+        //   float szX = 0, float szY = 0, string font = "White", BlockRefresh p = BlockRefresh.None, SpriteType type = SpriteType.TEXT,
         //   TextAlignment align = TextAlignment.CENTER, string command = "", string prepend = "", string append = "")
-        {
-            var eOut = "";
-            foreach (var surface in display.Outputs)
-            {
-                eOut += $"//\nscreen {surface.Key.Name} background color {surface.Key.BackgroundColor}\n";
-                foreach (var s in surface.Value.Values)
-                {
-                    eOut += $"new SpriteData(new Color({s.Color.R}, {s.Color.G}, {s.Color.B}, {s.Color.A}), {s.Name}, {s.Data}, ";
-                    eOut += $"{s.X}, {s.Y}, {s.RorS}, {s.sX}, {s.sY}, {s.FontID}, {s.Priority}, {s.Type}, {s.Alignment}, {s.Command}, {s.Prepend}, {s.Append});\n";
-                }
-            }
-            return eOut;
-        }
+        //{
+        //    var eOut = "";
+        //    foreach (var surface in display.Outputs)
+        //    {
+        //        eOut += $"//\nscreen {surface.Key.Name} background color {surface.Key.BackgroundColor}\n";
+        //        foreach (var s in surface.Value.Values)
+        //        {
+        //            eOut += $"new SpriteData(new Color({s.Color.R}, {s.Color.G}, {s.Color.B}, {s.Color.A}), {s.Name}, {s.Data}, ";
+        //            eOut += $"{s.X}, {s.Y}, {s.RorS}, {s.sX}, {s.sY}, {s.FontID}, {s.BlockRefresh}, {s.Type}, {s.Alignment}, {s.Command}, {s.Prepend}, {s.Append});\n";
+        //        }
+        //    }
+        //    return eOut;
+        //}
 
     }
 
