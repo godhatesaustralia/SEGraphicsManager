@@ -38,7 +38,8 @@ namespace IngameScript
         const int rtMax = 10; // theoretically accurate for update10
         double totalRt, RuntimeMS, WorstRun, AverageRun;
         Queue<double> runtimes = new Queue<double>(rtMax);
-        bool frozen = false, setupComplete, draw, useLogo, isCringe;
+        bool frozen = false, setupComplete, draw, useLogo, isCringe, larp;
+        TimeSpan addLarp;
         long Frame, WorstFrame;
         public long F => Frame;
         Priority p;
@@ -55,7 +56,9 @@ namespace IngameScript
             Static = new List<Display>();
             Utilities = new List<UtilityBase>();
             Inventory = new InventoryUtilities(t, new DebugAPI(program));
-
+            if (DateTime.Now.Date.Year % 4 == 0)
+                addLarp = TimeSpan.FromDays(36524);
+            else addLarp = TimeSpan.FromDays(36525);
             var result = new MyIniParseResult();
             using (var p = new iniWrap())
                 if (p.CustomData(Me, out result))
@@ -66,6 +69,7 @@ namespace IngameScript
                     min = p.Int(GCM, "minFrame", 256);
                     isCringe = p.Bool(GCM, "vanillaFont", false);
                     useLogo = p.Bool(GCM, "logo", false);
+                    larp = p.Bool(GCM, "larp", true);
                     var ctrl = p.String(GCM, "shipCTRL", "[I]");
                     Terminal.GetBlocksOfType<IMyShipController>(null, b =>
                     {
@@ -105,7 +109,7 @@ namespace IngameScript
                 Commands.Add("!def", b => { return; });
                 Commands.Add("!date", b =>
                 {
-                    b.Data = DateTime.Now.Date.Date.ToShortDateString();
+                    b.Data = (larp ? DateTime.Now + addLarp : DateTime.Now).Date.Date.ToShortDateString();
                 });
                 Commands.Add("!time", b =>
                 {
@@ -181,12 +185,21 @@ namespace IngameScript
                     }
                 }
                 else p = d.Setup(b);
-                if (p == Priority.High && FastDisplays.Count < FastDisplays.Capacity)
+                if (p == Priority.Fast && FastDisplays.Count < FastDisplays.Capacity)
+                {
                     FastDisplays.Add(d);
+                    _displaysMaster[d.Name] = FastDisplays.Find(e => e.Name == d.Name);
+                }
                 else if ((p & Priority.Normal) != 0)
+                {
                     Displays.Add(d);
-                else Static.Add(d);
-                _displaysMaster[d.Name] = d; // crossing my fingers
+                    _displaysMaster[d.Name] = Displays.Find(e => e.Name == d.Name);
+                }
+                else
+                {
+                    Static.Add(d);
+                    _displaysMaster[d.Name] =Static.Find(e => e.Name == d.Name);
+                }
                 DisplayBlocks.Remove(b);
             }
         }
@@ -237,65 +250,73 @@ namespace IngameScript
                 Program.Echo($"RUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun:0.####} ms\nPARSE CYCLES - {iniWrap.total}\nMYINI INSTANCES - {iniWrap.Count}\nFAILURES - {Lib.bsodsTotal}");
             }
 
-            if (arg != "" && _cmd.TryParse(arg.ToLower()))
+            if (arg != "")
             {
-                arg = arg.ToLower();
-                if (_displaysMaster.ContainsKey(_cmd.Argument(0)))
+                var c = '!';
+                if (arg.Contains(c))
                 {
-
+                    int j = 0;
+                    var urg = arg.Split(c);
+                    for (; j < urg.Length; j++)
+                        urg[j] = urg[j].Trim().Trim(c);
+                    if (_displaysMaster.ContainsKey(urg[0]) && int.TryParse(urg[1], out j))
+                         _displaysMaster[urg[0]].MFDSwitch(j, urg[2]);
                 }
-                switch (_cmd.Argument(0))
+                else
                 {
-                    case "restart":
-                        {
-                            Init();
-                            break;
-                        }
-                    case "reset":
-                    case "update":
-                        {
-                            Init(false);
-                            break;
-                        }
-                    case "vcr":
-                        {
-                            isCringe = !isCringe;
-                            Init(false);
-                            break;
-                        }
-                    case "freeze":
-                    case "toggle":
-                        {
-                            if (frozen)
+                    arg = arg.ToLower();
+                    switch (arg)
+                    {
+                        case "restart":
                             {
-                                Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
-                                frozen = false;
+                                Init();
                                 break;
                             }
-                            else
+                        case "reset":
+                        case "update":
                             {
+                                Init(false);
+                                break;
+                            }
+                        case "vcr":
+                            {
+                                isCringe = !isCringe;
+                                Init(false);
+                                break;
+                            }
+                        case "freeze":
+                        case "toggle":
+                            {
+                                if (frozen)
+                                {
+                                    Program.Runtime.UpdateFrequency = UpdateFrequency.Update1;
+                                    frozen = false;
+                                    break;
+                                }
+                                else
+                                {
+                                    Program.Runtime.UpdateFrequency = Lib.NONE;
+                                    frozen = true;
+                                    break;
+                                }
+                            }
+                        case "slow":
+                            {
+                                Program.Runtime.UpdateFrequency = UpdateFrequency.Update100;
+                                break;
+                            }
+                        case "wipe":
+                            {
+                                Wipe(ref FastDisplays);
+                                Wipe(ref Displays);
+                                Wipe(ref Static);
+                                Program.Echo("All displays wiped, ready to restart.");
                                 Program.Runtime.UpdateFrequency = Lib.NONE;
-                                frozen = true;
-                                break;
+                                return;
                             }
-                        }
-                    case "slow":
-                        {
-                            Program.Runtime.UpdateFrequency = UpdateFrequency.Update100;
-                            break;
-                        }
-                    case "wipe":
-                        {
-                            Wipe(ref FastDisplays);
-                            Wipe(ref Displays);
-                            Wipe(ref Static);
-                            Program.Echo("All displays wiped, ready to restart.");
-                            Program.Runtime.UpdateFrequency = Lib.NONE;
-                            return;
-                        }
-                    default: { break; }
+                        default: { break; }
+                    }
                 }
-                _cmd.Clear();
             }
             if (!setupComplete) return;
 
@@ -333,7 +354,7 @@ namespace IngameScript
                     AverageRun /= rtMax;
                 }
                 string r = "[[GRAPHICS MANAGER]]\n\n";
-                if (draw) r += $"DRAWING DISPLAY {dPtr + 1}/{Displays.Count}\n{Displays[dPtr].Name}.";
+                if (draw) r += $"DRAWING DISPLAY {dPtr + 1}/{Displays.Count}";
                 else if (Inventory.needsUpdate)
                     r += $"INV {Inventory.Pointer}/{Inventory.Count}";
                 else r += $"UTILS {iPtr + 1}/{Utilities.Count} - {Utilities[iPtr].Name}";

@@ -1,10 +1,13 @@
 ﻿using Sandbox.Game;
+using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI.Ingame;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using VRage;
+using VRage.Game;
+using VRage.Game.Components.Interfaces;
 using VRage.Game.ModAPI.Ingame;
 using VRage.Game.ModAPI.Ingame.Utilities;
 using VRage.Game.VisualScripting.Utils;
@@ -39,10 +42,10 @@ namespace IngameScript
             bar = 'b',
             pct = '%';
         protected string invalid = "••", name;
+
         public string Name => name.ToUpper();
         protected SpriteData jitSprite = new SpriteData();
         protected const double bad = double.NaN;
-        protected Dictionary<long, string> Formats = new Dictionary<long, string>();
         #endregion
 
         public virtual void Reset(GraphicsManager manager, MyGridProgram program)
@@ -50,7 +53,7 @@ namespace IngameScript
             GCM = manager;
             Program = program;
             TerminalSystem = program.GridTerminalSystem;
-            jitSprite.uID = long.MinValue;
+            jitSprite.uID = int.MinValue;
             GetBlocks();
         }
 
@@ -59,10 +62,7 @@ namespace IngameScript
             if (double.IsNaN(v)) d.Data = invalid;
             else d.SetData(v, def);
         }
-        public virtual void Update()
-        {
-
-        }
+        public abstract void Update();
 
         public abstract void GetBlocks();
 
@@ -74,6 +74,10 @@ namespace IngameScript
     // SO...command formatting. Depends on the general command, but here's the idea
     // this is all for the DATA field of the sprite.
     // <required param 1>$<required param 2>$...$<required param n>
+
+    // NEW COMMAND FORMATTING
+    // !cmd format unit sp_data1 sp_data2
+    // CAN WE EVEN DO IT?!?!?!?!?!?
 
     public class GasUtilities : UtilityBase
     {
@@ -139,13 +143,12 @@ namespace IngameScript
                 var t = HydrogenTime();
                 if (t == TimeSpan.Zero)
                     b.Data = invalid;
-                if (b.Format == "")
                     if (t.TotalHours >= 1)
                         b.Data = string.Format("{0,2}h {1,2}m", (long)t.TotalHours, (long)t.Minutes);
                     else
                         b.Data = string.Format("{0,2}m {1,2}s", (long)t.TotalMinutes, (long)t.Seconds);
-                else
-                    b.SetData(t.TotalSeconds);
+                //else
+                //    b.SetData(t.TotalSeconds);
             });
 
             commands.Add("!ice", b =>
@@ -162,10 +165,10 @@ namespace IngameScript
         }
 
         #endregion
-        double HydrogenStatus() => TankStatus(ref HydrogenTanks);
-        double OxygenStatus() => TankStatus(ref OxygenTanks);
+        double HydrogenStatus() => TankStatus(ref HydrogenTanks, true);
+        double OxygenStatus() => TankStatus(ref OxygenTanks, true);
 
-        double TankStatus(ref List<IMyGasTank> tanks)
+        double TankStatus(ref List<IMyGasTank> tanks, bool pct)
         {
             var amt = 0d;
             var total = amt;
@@ -174,7 +177,7 @@ namespace IngameScript
                 amt += tanks[i].FilledRatio * tanks[i].Capacity;
                 total += tanks[i].Capacity;
             }
-            return amt / total;
+            return pct ? amt / total : amt;
         }
 
         TimeSpan HydrogenTime()
@@ -291,12 +294,13 @@ namespace IngameScript
         public string Section, DebugString;   
         int updateStep = 5, ibPtr;
         bool ignoreTanks, ignoreGuns, ignoreSMConnectors, vanilla;
+        string _dat;
         public bool needsUpdate;
         List<IMyTerminalBlock> InventoryBlocks = new List<IMyTerminalBlock>();
         public int Count => InventoryBlocks.Count;
-        Dictionary<long, string[]>
-            itemKeys = new Dictionary<long, string[]>(),
-            itemTags = new Dictionary<long, string[]>();
+        Dictionary<int, string[]>
+            itemKeys = new Dictionary<int, string[]>(),
+            itemTags = new Dictionary<int, string[]>();
         List<MyInventoryItem> ItemScan = new List<MyInventoryItem>();
         // you know i had to do it to em
         public SortedList<string, InventoryItem> Items = new SortedList<string, InventoryItem>();
@@ -495,7 +499,7 @@ namespace IngameScript
             return true;
         }
 
-        void AddItemGroup(long id, string key)
+        void AddItemGroup(int id, string key)
         {
             using (var p = new iniWrap())
             {
@@ -527,7 +531,7 @@ namespace IngameScript
                                         Items.Add(item.ID, item);
                                     }
                                     catch (Exception) // keen dict problem
-                                    { continue; }
+                                    { continue;}
                                 k[i] = a[1] + cmd + a[2];
                                 if (a.Length != 3 && a.Length != 4)
                                     t[i] = "";
@@ -541,25 +545,22 @@ namespace IngameScript
                             }
                         }
                     }
-                    else
-                    {
-                        if (key != J) throw new Exception($"key {key} for command !itemslist not found in PB custom data.");
-                    }
-                else throw new Exception(result.Error);
+                else if (key != J) 
+                       throw new Exception($"key {key} for command !itemslist not found in PB custom data.");
             }
 
         }
 
-        void UpdateItemString(long id, ref SpriteData d)
+        void UpdateItemString(int id, ref SpriteData d)
         {
             if (!itemKeys.ContainsKey(id))
                 return;
+            _dat = "";
             var itm = Items[itemKeys[id][0]];
-            d.SetData(itm.Data, itemTags[id][0], itm.Format);
-            //if (itemKeys[id].Length == 1)
-            //    return;
+            _dat = $"{itemTags[id][0]}{Items[itemKeys[id][0]].ToString(true)}";
             for (int i = 1; i < itemKeys[id].Length; i++)
-                d.Data += $"\n{itemTags[id][i]}{Items[itemKeys[id][i]].ToString(true)}";
+              _dat += $"\n{itemTags[id][i]}{Items[itemKeys[id][i]].ToString(true)}";
+            d.Data = _dat;
         }
 
         #region UtilityBase
@@ -632,11 +633,13 @@ namespace IngameScript
                                 b.Data = b.Data.Trim();
                                 var s = b.Data.Split(cmd);
                                 if (s.Length == 2)
-                                    Items.Add(b.Data, new InventoryItem(s[0], s[1]));                                                                 
+                                    Items.Add(b.Data, new InventoryItem(s[0], s[1]));
+                                else if (s.Length == 3)
+                                    Items.Add(b.Data, new InventoryItem(s[0], s[1], s[2]));
                             }
                             if (!itemKeys.ContainsKey(b.uID))
                             {
-                                itemKeys.Add(b.uID, new string[] { b.Data });
+                                itemKeys[b.uID] = new string[] { b.Data };
                                 b.Data = invalid;
                             }
                         }
@@ -694,52 +697,6 @@ namespace IngameScript
         where T : IMyFunctionalBlock
     {
 
-    }
-
-
-    public class BlockUtilities : UtilityBase
-    {
-        readonly string tag;
-        List<IMyTerminalBlock> AllBlocks = new List<IMyTerminalBlock>();
-        List<IMyBlockGroup> AllGroups = new List<IMyBlockGroup>();
-        Dictionary<long, long[]> BlockKeys = new Dictionary<long, long[]>();
-        // TODO: make a new class or something (if i dont kill myself this week)
-        Dictionary<long, IMyFunctionalBlock> BlockData = new Dictionary<long, IMyFunctionalBlock>(); //temp
-
-        public BlockUtilities(string s)
-        {
-            name = "Blocks";
-            tag = s;
-        }
-
-        #region UtilityBase
-
-        public override void GetBlocks()
-        {
-            AllBlocks.Clear();
-            BlockKeys.Clear();
-            TerminalSystem.GetBlocksOfType(AllBlocks);
-            TerminalSystem.GetBlockGroups(AllGroups);
-        }
-
-        public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
-        {
-            commands.Add("!blkstatus", b =>
-            {
-                if (GCM.justStarted && !BlockKeys.ContainsKey(b.uID))
-                {
-                    var blk = AllBlocks.Find(c => c.CustomName == b.Data);
-                    if (blk != null && blk is IMyFunctionalBlock)
-                    {
-                        BlockData.Add(blk.EntityId, (IMyFunctionalBlock)blk);
-                        BlockKeys.Add(b.uID, new long[] { blk.EntityId });
-                    }
-                }
-                if (BlockKeys.ContainsKey(b.uID))
-                    b.Data = BlockData[BlockKeys[b.uID][0]].IsFunctional ? "ON" : "OFF";
-            });
-        }
-        #endregion
     }
 
     public class FlightUtilities : UtilityBase
@@ -815,7 +772,6 @@ namespace IngameScript
 
         public override void Update()
         {
-
             jump.Update();
         }
 
@@ -926,8 +882,9 @@ namespace IngameScript
         SortedList<Base6Directions.Direction, Info> groups = new SortedList<Base6Directions.Direction, Info>();
         Dictionary<Base6Directions.Direction, IMyThrust[]> dirThrust = new Dictionary<Base6Directions.Direction, IMyThrust[]>();
         Dictionary<Base6Directions.Direction, int> maxThrust = new Dictionary<Base6Directions.Direction, int>();
-        Dictionary<long, Base6Directions.Direction> idToDir = new Dictionary<long, Base6Directions.Direction>();
-        Dictionary<long, IMyThrust> singles = new Dictionary<long, IMyThrust>();
+        Dictionary<int, Base6Directions.Direction> idToDir = new Dictionary<int, Base6Directions.Direction>();
+        Dictionary<int, IMyThrust> singles = new Dictionary<int, IMyThrust>();
+        Vector2 _circl = new Vector2();
 
         public ThrustUtilities(string t)
         {
@@ -992,11 +949,12 @@ namespace IngameScript
                         if (t.CustomName.Contains(b.Name))
                         {
                             singles[b.uID] = t;
-                            Lib.GraphStorage[b.uID] = MyTuple.Create(false, b.sX);
+                            Lib.GraphStorage[b.uID] = MyTuple.Create(false, b.Sprite.Size?.X);
                         }
                         return false;
                     });
-                b.sX = b.sY = (.625f + singles[b.uID].CurrentThrust / singles[b.uID].MaxThrust) * Lib.GraphStorage[b.uID].Item2;
+                _circl.X = _circl.Y = (.625f + singles[b.uID].CurrentThrust / singles[b.uID].MaxThrust) * Lib.GraphStorage[b.uID].Item2.Value;
+                b.Sprite.Size = _circl;
             });
             commands.Add("!curthr%", b =>
             {
@@ -1194,112 +1152,122 @@ namespace IngameScript
         }
     }
 
-    public class WeaponUtilities// : UtilityBase
-    {
-        Dictionary<long, string[]> wpnTags = new Dictionary<long, string[]>();
-        Dictionary<long, Info> wpnData = new Dictionary<long, Info>(); // sprite uid to cached gun stats
-        Dictionary<long, IMyUserControllableGun> wpns = new Dictionary<long, IMyUserControllableGun>(); // eid to gun
-    }
+    //public class WeaponUtilities : UtilityBase
+    //{
+    //   // MyDefinitionId _nrg = new MyDefinitionId()
+    //    Dictionary<long, string[]> wpnTags = new Dictionary<long, string[]>();
+    //    Dictionary<long, Info> wpnData = new Dictionary<long, Info>(); // sprite uid to cached gun stats
+    //    Dictionary<long, IMyUserControllableGun> wpns = new Dictionary<long, IMyUserControllableGun>(); // eid to gun
+    //    public WeaponUtilities()
+    //    {
+    //        name = "Weapons";
+    //        GCM.Terminal.GetBlocksOfType<IMyUserControllableGun>(null, b =>
+    //        {
+    //            var c = b.Components.Get<MyResourceSinkComponent>();
+    //            return false;
+    //        });
+    //    }
+    //}
 
     // TODO: THIS SYSTEM IS ASS
-    public class CoreWeaponUtilities : UtilityBase
-    {
-        Dictionary<long, MyTuple<string, IMyTerminalBlock[]>> WeaponGroups = new Dictionary<long, MyTuple<string, IMyTerminalBlock[]>>();
-        Dictionary<long, string> tagStorage = new Dictionary<long, string>();
-        List<IMyTerminalBlock> wcWeapons = new List<IMyTerminalBlock>();
-        WCPBAPI api = null;
-        bool man = false;
+    //public class CoreWeaponUtilities : UtilityBase
+    //{
+    //    Dictionary<long, MyTuple<string, IMyTerminalBlock[]>> WeaponGroups = new Dictionary<long, MyTuple<string, IMyTerminalBlock[]>>();
+    //    Dictionary<long, string> tagStorage = new Dictionary<long, string>();
+    //    List<IMyTerminalBlock> wcWeapons = new List<IMyTerminalBlock>();
+    //    WCPBAPI api = null;
+    //    bool man = false;
 
-        public CoreWeaponUtilities()
-        {
-            name = "Weapons";
-        }
+    //    public CoreWeaponUtilities()
+    //    {
+    //        name = "Weapons";
+    //    }
 
-        #region UtilityBase
-        public override void Reset(GraphicsManager m, MyGridProgram p)
-        {
-            base.Reset(m, p);
-            WeaponGroups.Clear();
-            man = true;
-        }
+    //    #region UtilityBase
+    //    public override void Reset(GraphicsManager m, MyGridProgram p)
+    //    {
+    //        base.Reset(m, p);
+    //        WeaponGroups.Clear();
+    //        man = true;
+    //    }
 
-        public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
-        {
-            commands.Add("!wpnrdy", (b) =>
-            {
-                if (WCPBAPI.Activate(Program.Me, ref api))
-                {
-                    if (!WeaponGroups.ContainsKey(b.uID)) AddWeaponGroup(b);
-                    else UpdateWeaponReady(ref b);
-                }
-            });
-            commands.Add("!tgt", (b) =>
-            {
-                if (WCPBAPI.Activate(Program.Me, ref api))
-                {
-                    var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
-                    b.Data = focus.HasValue ? focus.Value.Name : "NO TARGET";
-                }
-            });
+    //    public override void Bind(ref Dictionary<string, Action<SpriteData>> commands)
+    //    {
+    //        commands.Add("!wpnrdy", (b) =>
+    //        {
+    //            if (WCPBAPI.Activate(Program.Me, ref api))
+    //            {
+    //                if (!WeaponGroups.ContainsKey(b.uID)) AddWeaponGroup(b);
+    //                else UpdateWeaponReady(ref b);
+    //            }
+    //        });
+    //        commands.Add("!tgt", (b) =>
+    //        {
+    //            if (WCPBAPI.Activate(Program.Me, ref api))
+    //            {
+    //                var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
+    //                b.Data = focus.HasValue ? focus.Value.Name : "NO TARGET";
+    //            }
+    //        });
 
-            commands.Add("!tgtdist", (b) =>
-            {
-                if (WCPBAPI.Activate(Program.Me, ref api))
-                {
-                    var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
-                    b.Data = focus.HasValue ? (focus.Value.Position - Program.Me.CubeGrid.GetPosition()).Length().ToString("4:####") : "NO TARGET";
-                }
-            });
+    //        commands.Add("!tgtdist", (b) =>
+    //        {
+    //            if (WCPBAPI.Activate(Program.Me, ref api))
+    //            {
+    //                var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
+    //                b.Data = focus.HasValue ? (focus.Value.Position - Program.Me.CubeGrid.GetPosition()).Length().ToString("4:####") : "NO TARGET";
+    //            }
+    //        });
 
-            commands.Add("!heats%", (b) =>
-            {
-                if (WCPBAPI.Activate(Program.Me, ref api))
-                {
-                    // todo
-                }
-            });
-        }
+    //        commands.Add("!heats%", (b) =>
+    //        {
+    //            if (WCPBAPI.Activate(Program.Me, ref api))
+    //            {
+    //                // todo
+    //            }
+    //        });
+    //    }
 
-        public override void GetBlocks()
-        {
-            if (!WCPBAPI.Activate(Program.Me, ref api))
-                return;
-            wcWeapons.Clear();
-            foreach (var t in tagStorage.Values)
-                TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
-                {
-                    if (b.IsSameConstructAs(Program.Me) && b.CustomName.Contains(t))
-                        wcWeapons.Add(b);
-                    return true;
-                });
-        }
+    //    public override void GetBlocks()
+    //    {
+    //        if (!WCPBAPI.Activate(Program.Me, ref api))
+    //            return;
+    //        wcWeapons.Clear();
+    //        foreach (var t in tagStorage.Values)
+    //            TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
+    //            {
+    //                if (b.IsSameConstructAs(Program.Me) && b.CustomName.Contains(t))
+    //                    wcWeapons.Add(b);
+    //                return true;
+    //            });
+    //    }
 
-        public override void Update() { }
+    //    public override void CheckUpdate() { }
 
-        #endregion
-        void AddWeaponGroup(SpriteData d)
-        {
-            var list = new List<IMyTerminalBlock>();
-            string[] dat = d.Data.Split(cmd);
-            if (!tagStorage.ContainsKey(d.uID))
-                tagStorage.Add(d.uID, dat[0]);
-            TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
-            {
-                if (b.IsSameConstructAs(Program.Me) && b.CustomName.Contains(dat[0]))
-                    list.Add(b);
-                return true;
-            });
-            if (list.Count > 0) WeaponGroups.Add(d.uID, new MyTuple<string, IMyTerminalBlock[]>(dat[1], list.ToArray()));
-        }
+    //    #endregion
+    //    void AddWeaponGroup(SpriteData d)
+    //    {
+    //        var list = new List<IMyTerminalBlock>();
+    //        string[] dat = d.Data.Split(cmd);
+    //        if (!tagStorage.ContainsKey(d.uID))
+    //            tagStorage.Add(d.uID, dat[0]);
+    //        TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
+    //        {
+    //            if (b.IsSameConstructAs(Program.Me) && b.CustomName.Contains(dat[0]))
+    //                list.Add(b);
+    //            return true;
+    //        });
+    //        if (list.Count > 0) WeaponGroups.Add(d.uID, new MyTuple<string, IMyTerminalBlock[]>(dat[1], list.ToArray()));
+    //    }
 
-        void UpdateWeaponReady(ref SpriteData d)
-        {
-            if (api == null) return;
-            int count = 0;
-            foreach (var wpn in WeaponGroups[d.uID].Item2)
-                if (api.IsWeaponReadyToFire(wpn)) count++;
-            d.Data = $"{WeaponGroups[d.uID].Item1} {count}/{WeaponGroups[d.uID].Item2.Length} RDY";
-        }
+    //    void UpdateWeaponReady(ref SpriteData d)
+    //    {
+    //        if (api == null) return;
+    //        int count = 0;
+    //        foreach (var wpn in WeaponGroups[d.uID].Item2)
+    //            if (api.IsWeaponReadyToFire(wpn)) count++;
+    //        d.Data = $"{WeaponGroups[d.uID].Item1} {count}/{WeaponGroups[d.uID].Item2.Length} RDY";
+    //    }
 
-    }
+    //}
 }

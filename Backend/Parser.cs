@@ -15,7 +15,6 @@ namespace IngameScript
     public class iniWrap : IDisposable
     {
         static List<MyIni> IniParsers = new List<MyIni>();
-        static List<int> IniUses = new List<int>();
         static int IniCount = 0;
         static public int total = 0;
         static public int Count => IniParsers.Count;
@@ -170,9 +169,10 @@ namespace IngameScript
         }
         string keymod(string s, string k)
         {
-            k = !myIni.ContainsKey(s, k.ToLower()) ? k : k.ToLower();
-            return k;
-        }
+                 k = !myIni.ContainsKey(s, k.ToLower()) ? k : k.ToLower();
+                return k;
+            
+            }
         public bool StringContains(string aSct, string t)
         {
             return aSct.Contains(t);

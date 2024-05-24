@@ -35,8 +35,9 @@ namespace IngameScript
     // MFD (mass fish death) functionality
     public class Screen
     {
+        // you aint built for these
         #region fields
-
+        
         public readonly string Name; // used as key
         public HashSet<string> CommandUsers = new HashSet<string>();
         public Dictionary<string, SpriteData> Sprites = new Dictionary<string, SpriteData>();
@@ -52,7 +53,7 @@ namespace IngameScript
             dsp = d;
         }
         // TODO - better error reporting
-        static void Default(Screen s)
+        static bool Default(Screen s)
         {
             var ts = s.dsp.TextureSize;
             var ss = s.dsp.SurfaceSize;
@@ -60,13 +61,13 @@ namespace IngameScript
             var c = (ts - ss) / 2;
             var r = ts / ss;
             var uh = 20 * r + 0.5f * c;
-            var d = new SpriteData(Color.White, s.Name, "", uh.X, uh.Y + (c.Y * 0.4f), c.Length() * 0.005275f, align: TextAlignment.LEFT);
+            var d = new SpriteData(Color.White, s.Name, "", uh.X, uh.Y + (c.Y * 0.4f), c.Length() * 0.005275f, align: TextAlignment.LEFT, font: "Monospace");
+            var f = s.dsp.DrawFrame();
             s.dsp.ScriptBackgroundColor = Color.Blue;
             d.Data = $"{s.dsp.Name}\nSURFACE {s.Name}\nSCREEN SIZE {ss}\nTEXTURE SIZE {ts}\nPOSITION OF THIS THING {uh}\n\n\n{Lib.bsod}";
-            d.FontID = "Monospace";
-            d.sprCached = SpriteData.CreateSprite(d, true);
-            var f = s.dsp.DrawFrame();
+
             f.Dispose();
+            return false;
         }
         void Die(string n)
         {
@@ -93,42 +94,44 @@ namespace IngameScript
                     l[i] = l[i].Trim();
                     //Program.Echo(ns[i]); 
                     }
-
+                    SpriteType type;
+                    TextAlignment align;
+                    float x, y, sx, sy, ros;
+                    string dat, font = null;
+                    var c = Lib.PINK;
                     dsp.ContentType = ContentType.SCRIPT;
                     for (i = 0; i < ct; i++)
                     {
+                        sx = sy = 0;
                         var spr = Keys.SpriteSection + l[i];
                         if (ini.HasSection(spr))// && !Outputs[surf].ContainsKey(ns[i]))
                         {
-                            var s = new SpriteData();
-                            s.Name = l[i];
-
                             if (!d.noVCR && ini.Bool(spr, Keys.Cringe, false))
                             {
-                                if (Sprites.ContainsKey(s.Name))
-                                    Sprites.Remove(s.Name);
+                                if (Sprites.ContainsKey(l[i]))
+                                    Sprites.Remove(l[i]);
                                 continue;
                             }
                             else if (d.noVCR && ini.Bool(spr, Keys.Based, false))
                             {
-                                if (Sprites.ContainsKey(s.Name))
-                                    Sprites.Remove(s.Name);
+                                if (Sprites.ContainsKey(l[i]))
+                                    Sprites.Remove(l[i]);
                                 continue;
                             }
 
-                            s.Type = ini.Type(spr, Keys.Type);
-                            s.Data = ini.String(spr, Keys.Data, "FAILED");
-                            s.Color = ini.Color(spr, Keys.Color);
+                            dat = ini.String(spr, Keys.Data, "FAILED");
+                            type = ini.Type(spr, Keys.Type);
+                            c = ini.Color(spr, Keys.Color);                  
+                            align = ini.Alignment(spr, Keys.Align);
 
-                            s.Alignment = ini.Alignment(spr, Keys.Align);
-                            if (!ini.TryReadVector2(spr, Keys.Pos, out s.X, out s.Y, Name))
+                            if (!ini.TryReadVector2(spr, Keys.Pos, out x, out y, Name))
                                 Die(l[i]);
 
-                            if (s.Type != Lib.TXT && !ini.TryReadVector2(spr, Keys.Size, out s.sX, out s.sY, Name))
+                            if (type != Lib.TXT && !ini.TryReadVector2(spr, Keys.Size, out sx, out sy, Name))
                                 Die(l[i]);
 
-                            if (s.Type != Lib.TXT)
-                                s.RorS = ini.Float(spr, Keys.Rotation, 0);
+                            if (type != Lib.TXT)
+                                ros = ini.Float(spr, Keys.Rotation, 0);
                             else
                             {
                                 string
@@ -136,41 +139,46 @@ namespace IngameScript
                                     vpos = Keys.Pos + m_vn,
                                     vscl = Keys.Scale + m_vn;
 
-                                s.FontID = s.Type == Lib.TXT ? ini.String(spr, Keys.Font, def) : "";
-                                if ((s.FontID == "VCR" || s.FontID == "VCRBold") && d.noVCR)
+                                font = type == Lib.TXT ? ini.String(spr, Keys.Font, def) : "";
+                                if ((font == "VCR" || font == "VCRBold") && d.noVCR)
                                 {
-                                    if (ini.HasKey(spr, vpos) && !ini.TryReadVector2(spr, vpos, out s.X, out s.Y, Name))
+                                    if (ini.HasKey(spr, vpos) && !ini.TryReadVector2(spr, vpos, out x, out y, Name))
                                         Die(l[i]);
-                                    s.FontID = def;
+                                    font = def;
                                     if (ini.HasKey(spr, vscl))
-                                        s.RorS = ini.Float(spr, vscl, 1);
+                                        ros = ini.Float(spr, vscl, 1);
                                     else
-                                        s.RorS = ini.Float(spr, Keys.Scale, 1);
+                                        ros = ini.Float(spr, Keys.Scale, 1);
                                     if (ini.HasKey(spr, Keys.Align + m_vn))
-                                        s.Alignment = ini.Alignment(spr, Keys.Align + m_vn);
-                                    s.Data = ini.String(spr, Keys.Data + m_vn, s.Data);
+                                        align = ini.Alignment(spr, Keys.Align + m_vn);
+                                    dat = ini.String(spr, Keys.Data + m_vn, dat);
                                 }
                                 else
-                                    s.RorS = ini.Float(spr, Keys.Scale, 1);
-                                if (ini.HasKey(spr, Keys.Rotation))
-                                    s.RorS = ini.Float(spr, Keys.Rotation, 0);
+                                {
+                                    ros = ini.Float(spr, Keys.Scale, 1);
+                                    if (ini.HasKey(spr, Keys.Rotation))
+                                        ros = ini.Float(spr, Keys.Rotation, 0);
+                                }
                             }
 
-                            s.Priority = (Priority)ini.Int(spr, Keys.Update, 0);
+                            var p2 = (Priority)ini.Int(spr, Keys.Update, 0);
+                            var s = type == Lib.TXT ? new SpriteData(c, l[i], dat, x, y, ros, font, p2, align) : new SpriteData(c, l[i], dat, x, y, ros, sx, sy, p2, align, clip: type == SpriteType.CLIP_RECT);
+
                             p |= s.Priority;
 
-                            if (ini.HasKey(spr, Keys.Command) && s.Priority != 0)
+                            if (ini.HasKey(spr, Keys.Command)) 
                             {
-                                if (s.Priority != Priority.None && s.commandID != "")
-                                {
-                                    s.uID = d.dEID + index + i;
-                                    s.commandID = ini.String(spr, Keys.Command, "!def");
+                                var cmd = ini.String(spr, Keys.Command, "!def");
+                                if (cmd == "!screen")
+                                    s.Data = ini.String(spr, Keys.Format) == "caps" ? Name.ToUpper() : Name;
+                                else
+                                {        
                                     s.Format = ini.String(spr, Keys.Format);
-                                    if (!cmds.ContainsKey(s.commandID))
-                                        throw new Exception($"PARSE FAILURE: sprite {s.Name} on screen {Name} ({d.Name}) has invalid command {s.commandID}");
-
+                                    if (!cmds.ContainsKey(cmd))
+                                        throw new Exception($"PARSE FAILURE: sprite {s.Name} on screen {Name} ({d.Name}) has invalid command {cmd}");
+                                  
                                     CommandUsers.Add(s.Name);
-                                    s.Command = cmds[s.commandID];
+                                    s.Command = cmds[cmd];
                                     s.Command.Invoke(s);
 
                                     if (d.noVCR)
@@ -187,43 +195,22 @@ namespace IngameScript
                                         if (ini.HasKey(spr, Keys.Append))
                                             s.Append = " " + ini.String(spr, Keys.Append);
                                     }
+                                   
                                 }
-                                s.SetFlags();
+                                s.SetFlags(cmd);
                             }
-                            s.sprCached = SpriteData.CreateSprite(s, true);
                             Sprites[s.Name] = s;
                         }
                         else
-                        {
-                            Default(this);
-                            good = false;
-                        }
+                            good = Default(this);
                     }
                 }
-                else
-                {
-                    Default(this);
-                    return false;
-                }
+                else return Default(this);
             }
             Refresh = p;
             return good;
         }
 
-        //public void Update()
-        //{
-        //    bool changed = false;
-        //    foreach (var n in CommandUsers)
-        //        if (Sprites[n].Update())
-        //            changed = true;
-        //    if (!changed) return;
-        //    var f = dsp.DrawFrame();
-        //    foreach (var s in Sprites.Values)
-        //        if (s.uID == -1)
-        //            f.Add(s.sprCached);
-        //        else f.Add(SpriteData.CreateSprite(s));
-        //    f.Dispose();
-        //}
     }
 
     public class Display
@@ -233,13 +220,12 @@ namespace IngameScript
         public Priority BlockRefresh = 0;
         public Dictionary<string, Screen> Outputs = new Dictionary<string, Screen>();
         public Dictionary<int, string> ActiveScreens = new Dictionary<int, string>(); // active n of screens by surface index
-        public Dictionary<int, List<string>> ScreenNames = new Dictionary<int, List<string>>();
+        public Dictionary<int, HashSet<string>> ScreenNames = new Dictionary<int, HashSet<string>>();
         public readonly string Name;
         public readonly long dEID;
         public bool isEnabled => Host?.Enabled ?? true;
         public readonly bool isSingleScreen, noVCR;
         public Color logoColor = Color.White;
-        bool MFD = false;
         readonly IMyFunctionalBlock Host;
         GraphicsManager _m;
        
@@ -298,12 +284,16 @@ namespace IngameScript
                     Outputs.Clear();
                     return true;
                 }
-                if (!ini.HasKey(sect, Keys.ScreenList)) // for non-MFDs
+                var mfd = ini.HasKey(sect, Keys.ScreenList);
+                if (!mfd) // for non-MFDs
                 {
                     var sc = new Screen($"def{index}", surf);
-                    sc.AddSprites(MFD, this, ref ini, _m.Commands, ref index, out p);
+                    sc.AddSprites(mfd, this, ref ini, _m.Commands, ref index, out p);
                     Outputs.Add(sc.Name, sc);
                     ActiveScreens.Add(index, sc.Name);
+                    if (ScreenNames.ContainsKey(index))
+                        ScreenNames[index].Add(sc.Name);
+                    else ScreenNames[index] = new HashSet<string> { sc.Name };
                     return true;
                 }
                 var n = ini.String(sect, Keys.ScreenList, f);
@@ -314,14 +304,13 @@ namespace IngameScript
                     Outputs.Add(sc.Name, sc);              
                     return false;
                 }
-                MFD = true;
                 var ns = n.Split('\n'); // getting names of different screens
                 for (; i < ns.Length; i++)
                 {
                     ns[i] = ns[i].Trim('>');
                     ns[i] = ns[i].Trim();
                     var sc = new Screen(ns[i], surf);
-                    var ok = sc.AddSprites(MFD, this, ref ini, _m.Commands, ref index, out p);
+                    var ok = sc.AddSprites(mfd, this, ref ini, _m.Commands, ref index, out p);
                     if (!ok)
                         Default(ref sc);
                     good &= ok;
@@ -341,11 +330,8 @@ namespace IngameScript
             var c = (ts - ss) / 2;
             var r = ts / ss;
             var uh = 20 * r + 0.5f * c;
-            var d = new SpriteData(Color.White, s.Name, "", uh.X, uh.Y + (c.Y * 0.4f), c.Length() * 0.005275f, align: TextAlignment.LEFT);
+            var d = new SpriteData(Color.White, s.Name, "", uh.X, uh.Y + (c.Y * 0.4f), c.Length() * 0.005275f, align: TextAlignment.LEFT, font: "Monospace");
             s.dsp.ScriptBackgroundColor = Color.Blue;
-            d.Data = $"{s.dsp.Name}\nSURFACE {s.Name}\nSCREEN SIZE {ss}\nTEXTURE SIZE {ts}\nPOSITION OF THIS THING {uh}\n\n\n{Lib.bsod}";
-            d.FontID = "Monospace";
-            d.sprCached = SpriteData.CreateSprite(d, true);
             var f = s.dsp.DrawFrame();
             f.Dispose();
         }
@@ -363,10 +349,6 @@ namespace IngameScript
                 {
                     var DisplayBlock = (IMyTextSurface)block;
                     ok &= TryParse(ref DisplayBlock, ref p, ref index, out pri);
-                    //Outputs.Add(DisplayBlock, new Dictionary<string, SpriteData>());
-                    //if (TryParse(ref DisplayBlock, ref p, ref index, out pri))
-                    //    ret = pri;
-                    //Refresh.Add(DisplayBlock, pri);
                     ret = pri;
 
                 }
@@ -382,11 +364,6 @@ namespace IngameScript
                         //if (!Outputs.ContainsKey(surface))
                         //    Outputs.Add(surface, new Dictionary<string, SpriteData>());
                         ok &= TryParse(ref surface, ref p, ref index, out pri);
-                        //if (TryParse(ref surface, ref p, ref index, out pri))
-                        //    ret |= pri;
-                        //else
-                        //    Refresh.Add(surface, BlockRefresh.None);
-                        //ret |= pri;
                         ret |= pri;
                     }
                 }
@@ -402,22 +379,11 @@ namespace IngameScript
                 s.dsp.ScriptBackgroundColor = s.BG;
                 var f = s.dsp.DrawFrame();
                 foreach (var n in s.CommandUsers)
-                    s.Sprites[n].Update();
+                    s.Sprites[n].CheckUpdate();
                 foreach (var spr in s.Sprites.Values)
-                    if (spr.uID == -1)
-                        f.Add(spr.sprCached);
-                    else f.Add(SpriteData.CreateSprite(spr));
+                    f.Add(spr.Sprite);
                 f.Dispose();
             }
-
-
-            //foreach (var scr in Outputs.Values)
-            //{
-            //    var frame = scr.Key.DrawFrame();
-            //    foreach (var sprite in scr.Value)
-            //        DrawNewSprite(ref frame, sprite.Value);
-            //    frame.Dispose();
-            //}
             return ret;
         }
 
@@ -429,184 +395,14 @@ namespace IngameScript
 
         #endregion
 
-        #region setupOld
-        //bool TryParseOld(ref IMyTextSurface surf, ref iniWrap ini, ref byte index, out BlockRefresh p)
-        //{
-        //    string sect;
-        //    int i = 0;
-        //    p = BlockRefresh.None;
-        //    bool good = true;
-        //    if (!isSingleScreen)
-        //        sect = $"{Keys.SurfaceSection}_{index}";
-        //    else
-        //        sect = Keys.SurfaceSection;
+        public void MFDSwitch(int i, string n)
+        {
+            if (!(ScreenNames.ContainsKey(i) && ScreenNames[i].Contains(n)))
+                return;
+            ActiveScreens[i] = n;
 
-        //    CommandUsers.Add(surf, new HashSet<string>());
-        //    if (!ini.HasSection(sect))
-        //        return false;
-        //    else
-        //    {
-        //        surf.Script = "";
-        //        surf.ScriptBackgroundColor = ini.Color(sect, Keys.Color + "_BG");
-        //        var fail = "~";
-        //        if (ini.HasKey(sect, Keys.Color + m_lg))
-        //            logoColor = ini.Color(sect, Keys.Color + m_lg);
+        }
 
-        //        if (isSingleScreen && ini.Bool(sect, Keys.Logo))
-        //        {
-        //            BlockRefresh = BlockRefresh.None;
-        //            Outputs.Clear();
-        //            return true;
-        //        }
-
-        //        var names = ini.String(sect, Keys.List, fail);
-        //        if (names == fail)
-        //        {
-        //            DefaultOld(ref surf);
-        //            return false;
-        //        }
-        //        var nArray = names.Split('\n');
-        //        for (; i < nArray.Length; i++)
-        //        {
-        //            nArray[i] = nArray[i].Trim('>');
-        //            nArray[i] = nArray[i].Trim();
-        //            //Program.Echo(ns[i]); 
-        //        }
-
-        //        if (nArray.Length > 0)
-        //        {
-        //            surf.ContentType = ContentType.SCRIPT;
-        //            for (i = 0; i < nArray.Length; i++)
-        //            {
-        //                var spr = Keys.SpriteSection + nArray[i];
-        //                if (ini.HasSection(spr))// && !Outputs[surf].ContainsKey(ns[i]))
-        //                {
-        //                    var s = new SpriteData();
-        //                    s.Name = nArray[i];
-
-        //                    if (!noVCR && ini.Bool(spr, Keys.Cringe, false))
-        //                    {
-        //                        if (Outputs[surf].ContainsKey(s.Name))
-        //                            Outputs[surf].Remove(s.Name);
-        //                        continue;
-        //                    }
-        //                    else if (noVCR && ini.Bool(spr, Keys.Based, false))
-        //                    {
-        //                        if (Outputs[surf].ContainsKey(s.Name))
-        //                            Outputs[surf].Remove(s.Name);
-        //                        continue;
-        //                    }
-
-        //                    s.Type = ini.Type(spr, Keys.Type);
-        //                    s.Data = ini.String(spr, Keys.Data, "FAILED");
-        //                    s.Color = ini.Color(spr, Keys.Color);
-
-        //                    s.Alignment = ini.Alignment(spr, Keys.Align);
-        //                    if (!ini.TryReadVector2(spr, Keys.Pos, out s.X, out s.Y, Name))
-        //                        Die(nArray[i]);
-
-        //                    if (s.Type != Lib.TXT && !ini.TryReadVector2(spr, Keys.Size, out s.sX, out s.sY, Name))
-        //                        Die(nArray[i]);
-
-        //                    if (s.Type != Lib.TXT)
-        //                        s.RorS = ini.Float(spr, Keys.Rotation, 0);
-        //                    else
-        //                    {
-        //                        string
-        //                            def = "White",
-        //                            vpos = Keys.Pos + m_vn,
-        //                            vscl = Keys.Scale + m_vn;
-
-        //                        s.FontID = s.Type == Lib.TXT ? ini.String(spr, Keys.Font, def) : "";
-        //                        if ((s.FontID == "VCR" || s.FontID == "VCRBold") && noVCR)
-        //                        {
-        //                            if (ini.HasKey(spr, vpos) && !ini.TryReadVector2(spr, vpos, out s.X, out s.Y, Name))
-        //                                Die(nArray[i]);
-        //                            s.FontID = def;
-        //                            if (ini.HasKey(spr, vscl))
-        //                                s.RorS = ini.Float(spr, vscl, 1);
-        //                            else
-        //                                s.RorS = ini.Float(spr, Keys.Scale, 1);
-        //                            if (ini.HasKey(spr, Keys.Align + m_vn))
-        //                                s.Alignment = ini.Alignment(spr, Keys.Align + m_vn);
-        //                            s.Data = ini.String(spr, Keys.Data + m_vn, s.Data);
-        //                        }
-        //                        else
-        //                            s.RorS = ini.Float(spr, Keys.Scale, 1);
-        //                        if (ini.HasKey(spr, Keys.Rotation))
-        //                            s.RorS = ini.Float(spr, Keys.Rotation, 0);
-        //                    }
-
-        //                    s.BlockRefresh = (BlockRefresh)ini.Int(spr, Keys.Update, 0);
-        //                    p |= s.BlockRefresh;
-
-        //                    if (ini.HasKey(spr, Keys.Command) && s.BlockRefresh != 0)
-        //                    {
-        //                        if (s.BlockRefresh != BlockRefresh.None && s.commandID != "")
-        //                        {
-        //                            s.uID = dEID +  index + i;
-        //                            s.commandID = ini.String(spr, Keys.Command, "!def");
-        //                            s.Format = ini.String(spr, Keys.Format);
-        //                            if (!Commands.ContainsKey(s.commandID))
-        //                                throw new Exception($"PARSE FAILURE: sprite {s.Name} on screen {Name} has invalid command {s.commandID}");
-
-        //                            CommandUsers[surf].Add(s.Name);
-        //                            s.Command = Commands[s.commandID];
-        //                            s.Command.Invoke(s);
-
-        //                            if (noVCR)
-        //                            {
-        //                                if (ini.HasKey(spr, Keys.Prepend + m_vn))
-        //                                    s.Prepend = ini.String(spr, Keys.Prepend + m_vn) + " ";
-        //                                if (ini.HasKey(spr, Keys.Append + m_vn))
-        //                                    s.Append = " " + ini.String(spr, Keys.Append + m_vn);
-        //                            }
-        //                            else
-        //                            {
-        //                                if (ini.HasKey(spr, Keys.Prepend))
-        //                                    s.Prepend = ini.String(spr, Keys.Prepend) + " ";
-        //                                if (ini.HasKey(spr, Keys.Append))
-        //                                    s.Append = " " + ini.String(spr, Keys.Append);
-        //                            }
-        //                        }
-        //                        s.SetFlags();
-        //                    }
-        //                    s.sprCached = SpriteData.CreateSprite(s, true);
-        //                    Outputs[surf][s.Name] = s;
-        //                }
-        //                else
-        //                {
-        //                    DefaultOld(ref surf);
-        //                    good = false;
-        //                }
-        //            }
-        //        }
-        //        else
-        //        {
-        //            DefaultOld(ref surf);
-        //            return false;
-        //        }
-        //    }
-        //    return good;
-        //}
-        // TODO - better error reporting
-        //void DefaultOld(ref IMyTextSurface s)
-        //{
-        //    Lib.bsodsTotal++;
-        //    var c = (s.TextureSize - s.SurfaceSize) / 2;
-        //    var r = s.TextureSize / s.SurfaceSize;
-        //    var uh = 20 * r + 0.5f * c;
-        //    var d = new SpriteData(Color.White, s.Name, "", uh.X, uh.Y + (c.Y * 0.4f), c.Length() * 0.005275f, align: TextAlignment.LEFT);
-        //    s.ScriptBackgroundColor = Color.Blue;
-        //    d.Data = $"{Name}\nSURFACE {s.Name}\nSCREEN SIZE {s.SurfaceSize}\nTEXTURE SIZE {s.TextureSize}\nPOSITION OF THIS THING {uh}\n\n\n{Lib.bsod}";
-        //    d.FontID = "Monospace";
-        //    d.sprCached = SpriteData.CreateSprite(d, true);
-        //    var f = s.DrawFrame();
-        //    if (!Outputs.ContainsKey(s))
-        //        Outputs[s].Add(Name, d);
-        //    f.Dispose();
-        //}
-        #endregion
 
         public void Reset()
         {
@@ -627,9 +423,7 @@ namespace IngameScript
                 var acs = Outputs[n];
                 var f = acs.dsp.DrawFrame();
                 foreach (var s in acs.Sprites.Values)
-                    if (s.uID == -1)
-                        f.Add(s.sprCached);
-                    else f.Add(SpriteData.CreateSprite(s));
+                        f.Add(s.Sprite);
                 f.Dispose();
             }    
         }
@@ -644,15 +438,13 @@ namespace IngameScript
                     var acs = Outputs[n];
                     bool changed = false;
                     foreach (var sn in acs.CommandUsers)
-                        changed |= acs.Sprites[sn].Update();
+                        changed |= acs.Sprites[sn].CheckUpdate();
 
                     if (!changed)
                         continue;
                     var f = acs.dsp.DrawFrame();
                     foreach (var s in acs.Sprites.Values)
-                        if (s.uID == -1)
-                            f.Add(s.sprCached);
-                        else f.Add(SpriteData.CreateSprite(s));
+                         f.Add(s.Sprite);
                     f.Dispose();
                 }
         }
