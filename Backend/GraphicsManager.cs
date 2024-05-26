@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using VRage;
 using VRage.Game.ModAPI.Ingame.Utilities;
 
 namespace IngameScript
@@ -19,10 +20,10 @@ namespace IngameScript
         public IMyShipController Controller;
 
         public string Tag, GCM, Name;
-
         public Dictionary<string, Action<SpriteData>> Commands = new Dictionary<string, Action<SpriteData>>();
-        Dictionary<string, bool> inUse = new Dictionary<string, bool>();
-        Dictionary<string, Display> _displaysMaster = new Dictionary<string, Display>();
+        //Dictionary<string, bool> inUse = new Dictionary<string, bool>();
+        // name to  (list #, list index)
+        Dictionary<string, MyTuple<int, int>> _displaysMaster = new Dictionary<string, MyTuple<int, int>>();
         List<Display> Displays, FastDisplays, Static;
         List<CoyLogo> logos = new List<CoyLogo>();
         MyCommandLine _cmd = new MyCommandLine();
@@ -188,17 +189,17 @@ namespace IngameScript
                 if (p == Priority.Fast && FastDisplays.Count < FastDisplays.Capacity)
                 {
                     FastDisplays.Add(d);
-                    _displaysMaster[d.Name] = FastDisplays.Find(e => e.Name == d.Name);
+                    _displaysMaster[d.Name] = MyTuple.Create(0, FastDisplays.IndexOf(d));
                 }
                 else if ((p & Priority.Normal) != 0)
                 {
                     Displays.Add(d);
-                    _displaysMaster[d.Name] = Displays.Find(e => e.Name == d.Name);
+                    _displaysMaster[d.Name] = MyTuple.Create(1, Displays.IndexOf(d));
                 }
                 else
                 {
                     Static.Add(d);
-                    _displaysMaster[d.Name] =Static.Find(e => e.Name == d.Name);
+                    _displaysMaster[d.Name] = MyTuple.Create(2, Static.IndexOf(d));
                 }
                 DisplayBlocks.Remove(b);
             }
@@ -217,7 +218,6 @@ namespace IngameScript
                 foreach (var d in ds)
                     d.SetPriority();
         }
-
 
         public void Update(string arg, UpdateType source)
         {
@@ -255,12 +255,30 @@ namespace IngameScript
                 var c = '!';
                 if (arg.Contains(c))
                 {
-                    int j = 0;
+                    int j = 0, k;
                     var urg = arg.Split(c);
-                    for (; j < urg.Length; j++)
-                        urg[j] = urg[j].Trim().Trim(c);
-                    if (_displaysMaster.ContainsKey(urg[0]) && int.TryParse(urg[1], out j))
-                         _displaysMaster[urg[0]].MFDSwitch(j, urg[2]);
+                    // if (urg.Length == 3) 
+                    {
+                        for (; j < urg.Length; j++)
+                            urg[j] = urg[j].Trim().Trim(c);
+                        if (_displaysMaster.ContainsKey(urg[0]) && int.TryParse(urg[1], out j))
+                        {
+                            k = _displaysMaster[urg[0]].Item2;
+                            switch (_displaysMaster[urg[0]].Item1)
+                            {
+                                case 0:
+                                   FastDisplays[k].MFDSwitch(j, urg[2]);
+                                    break;
+                                case 1:
+                                default:
+                                   Displays[k].MFDSwitch(j, urg[2]);
+                                    break;
+                                case 2:
+                                    Static[k].MFDSwitch(j, urg[2]);
+                                    break;
+                            }
+                        }
+                    }
                 }
                 else
                 {

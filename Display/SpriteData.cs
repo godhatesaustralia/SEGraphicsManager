@@ -24,6 +24,7 @@ namespace IngameScript
         public Priority Priority;
         public int uID = -1; // this field is only set if sprite is using a cmd.
         public string Name;
+        object _lastValue;
         public string
             LastData,
             Format,
@@ -35,8 +36,6 @@ namespace IngameScript
             get { return Sprite.Data; }
             set
             {
-                if (value == LastData) return;
-                LastData = Data;
                 Sprite.Data = value;
             }
         }
@@ -121,10 +120,9 @@ namespace IngameScript
         public bool CheckUpdate()
         {
             Command.Invoke(this);
+            if (Builder) ApplyBuilder(this);
             var b = Data != LastData;
-            if (b)
-                LastData = Data;
-            if (Builder) ApplyBuilder(this);          
+            LastData = Data;
             return b;
         }
 

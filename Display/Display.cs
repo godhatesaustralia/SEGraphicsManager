@@ -397,8 +397,18 @@ namespace IngameScript
 
         public void MFDSwitch(int i, string n)
         {
+            string test = "";
+            foreach (var key in ScreenNames.Keys)
+            {
+                test += $"\n\n{key}";
+                if (ScreenNames[key].Count != 0)
+                    foreach (var n2 in ScreenNames[key])
+                        test += $"\n{n2}";
+            }
+            throw new Exception($"\nswitch executed {Name} {i}-{n} populated {ScreenNames.Count != 0} test {test}");
             if (!(ScreenNames.ContainsKey(i) && ScreenNames[i].Contains(n)))
                 return;
+            
             ActiveScreens[i] = n;
 
         }
