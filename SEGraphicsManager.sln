@@ -11,6 +11,8 @@ Project("{D954291E-2A0B-460D-934E-DC6B0785DB48}") = "Display", "Display\Display.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NameFixerThing", "NameFixerThing\NameFixerThing.csproj", "{A4A157A6-3290-4682-99CC-CF3C2A8CD30A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AviationGCM", "AviationGCM\AviationGCM.csproj", "{E0DEFBC1-C389-4B2B-922E-6F0E1606E299}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -20,6 +22,8 @@ Global
 		{8C13D670-DC24-46E3-95E5-BFC21816FB32}.Debug|x64.Build.0 = Debug|x64
 		{A4A157A6-3290-4682-99CC-CF3C2A8CD30A}.Debug|x64.ActiveCfg = Debug|x64
 		{A4A157A6-3290-4682-99CC-CF3C2A8CD30A}.Debug|x64.Build.0 = Debug|x64
+		{E0DEFBC1-C389-4B2B-922E-6F0E1606E299}.Debug|x64.ActiveCfg = Debug|x64
+		{E0DEFBC1-C389-4B2B-922E-6F0E1606E299}.Debug|x64.Build.0 = Debug|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -31,6 +35,8 @@ Global
 		Backend\Backend.projitems*{8c13d670-dc24-46e3-95e5-bfc21816fb32}*SharedItemsImports = 4
 		Display\Display.projitems*{8c13d670-dc24-46e3-95e5-bfc21816fb32}*SharedItemsImports = 4
 		Display\Display.projitems*{c5477161-f854-436b-a478-e9dd4696aba5}*SharedItemsImports = 13
+		Backend\Backend.projitems*{e0defbc1-c389-4b2b-922e-6f0e1606e299}*SharedItemsImports = 4
+		Display\Display.projitems*{e0defbc1-c389-4b2b-922e-6f0e1606e299}*SharedItemsImports = 4
 		Backend\Backend.projitems*{fd560456-c473-4db0-99da-e256cc52fac8}*SharedItemsImports = 13
 	EndGlobalSection
 EndGlobal

@@ -18,14 +18,13 @@ namespace IngameScript
             Manager.AddUtil(new PowerUtilities());
             //Manager.AddUtil(new BlockUtilities(tag));
             //Manager.AddUtil(new ThrustUtilities(tag));
-
             //Manager.Utilities.Add(new CoreWeaponUtilities());
             Manager.Init();
         }
 
         public void Main(string argument, UpdateType updateSource)
         {
-                Manager.Update(argument, updateSource);
+            Manager.Update(argument, updateSource);
         }
     }
 }

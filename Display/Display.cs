@@ -1,32 +1,41 @@
-﻿using Sandbox.Engine.Platform.VideoMode;
-using Sandbox.Game.EntityComponents;
-using Sandbox.Game.Weapons.Guns;
-using Sandbox.ModAPI.Ingame;
-using Sandbox.ModAPI.Interfaces;
-using SpaceEngineers.Game.ModAPI.Ingame;
+﻿using Sandbox.ModAPI.Ingame;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using System.Runtime.InteropServices;
-using System.Security.Cryptography;
-using System.Security.Policy;
-using System.Text;
-using VRage;
-using VRage.Collections;
-using VRage.Game;
-using VRage.Game.Components;
 using VRage.Game.GUI.TextPanel;
-using VRage.Game.ModAPI.Ingame;
 using VRage.Game.ModAPI.Ingame.Utilities;
-using VRage.Game.ObjectBuilders.Definitions;
-using VRage.Scripting;
 using VRageMath;
-using VRageRender;
 
 namespace IngameScript
 {
+    public static class Keys
+    {
+        public static readonly string
+             SurfaceSection = "SURFACE",
+             ScreenSection = "SCREEN_",
+             SpriteSection = "SPRITE_", // always named, so just bake in the underscore 
+             Cycle = "CYCLE",
+             ScreenList = "SCREENS",
+             List = "LIST",
+             Logo = "LOGO",
+             Type = "TYPE",
+             Data = "DATA",
+             Size = "SIZE",
+             Align = "ALIGN",
+             Pos = "POS",
+             Rotation = "ROTATION",
+             Scale = "SCALE",
+             Color = "COLOR",
+             Font = "FONT",
+             Format = "FORMAT",
+             Command = "CMD",
+             Update = "PRIORITY",
+             Conditions = "CONDITIONS",
+             Based = "BASED",
+             Cringe = "VNLA",
+             Prepend = "PREP",
+             Append = "APP";
+    }
+
     // new (5/11/24)
     // this is a screen - the base unit of script
     // it is a self-contained collection of sprites
@@ -196,6 +205,12 @@ namespace IngameScript
                                             s.Append = " " + ini.String(spr, Keys.Append);
                                     }
                                    
+                                }
+                                if (ini.HasKey(spr, Keys.Conditions))
+                                {
+                                    var sc = new SpriteConditional(s);
+                                    sc.CreateMappings(ini.String(spr, Keys.Conditions));
+                                    s = sc;
                                 }
                                 s.SetFlags(cmd);
                             }

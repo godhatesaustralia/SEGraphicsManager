@@ -107,11 +107,8 @@ namespace IngameScript
             {
                 Frame = WorstFrame = 0;
                 RuntimeMS = WorstRun = AverageRun = totalRt = 0;
-                Commands.Add("!def", b => { return; });
-                Commands.Add("!date", b =>
-                {
-                    b.Data = (larp ? DateTime.Now + addLarp : DateTime.Now).Date.Date.ToShortDateString();
-                });
+                Commands.Add("!def", b => { return; }); // safety
+                Commands.Add("!date", b => b.Data = (larp ? DateTime.Now + addLarp : DateTime.Now).Date.Date.ToShortDateString());
                 Commands.Add("!time", b =>
                 {
                     var time = DateTime.Now.TimeOfDay;

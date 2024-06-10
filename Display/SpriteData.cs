@@ -17,27 +17,22 @@ namespace IngameScript
         #region fields
         const string l = "list";
         static int idBase = 3;
-        bool isList, noFormat, hide;
+        bool isList, noFormat;
         public MySprite Sprite;
         public Action<SpriteData> Command = null;
-        public double Unit = 1;
         public Priority Priority;
         public int uID = -1; // this field is only set if sprite is using a cmd.
         public string Name;
-        object _lastValue;
         public string
             LastData,
             Format,
             Prepend,
             Append;
-        public Color Color;
-        public string Data
+
+        public virtual string Data
         {
             get { return Sprite.Data; }
-            set
-            {
-                Sprite.Data = value;
-            }
+            set { Sprite.Data = value; }
         }
 
         public SpriteData[] Children;
@@ -85,26 +80,11 @@ namespace IngameScript
             Format = format;
             SetFlags(cmd);
         }
-        public void SetData(double value, string def = "")
+        public virtual void SetData(double value, string def = "")
         {
             if (isList || noFormat)
                 Data = value.ToString(def);
             else Data = value.ToString(Format);
-        }
-        // variant for tags (string t)
-        public void SetData(double value, string t, string def)
-        {
-            if (isList || noFormat)
-                Data = t + value.ToString(def);
-
-            else Data = t + value.ToString(Format);
-        }
-
-        public void SetData(string line, bool list = false)
-        {
-            if (list)
-                Sprite.Data += "\n" + line;
-            else Data = line;
         }
 
         static void ApplyBuilder(SpriteData d)
@@ -117,7 +97,7 @@ namespace IngameScript
         }
 
         // note (5/23/24): THE ORDER IS VERY VERY IMPORTANT
-        public bool CheckUpdate()
+        public virtual bool CheckUpdate()
         {
             Command.Invoke(this);
             if (Builder) ApplyBuilder(this);
@@ -137,6 +117,105 @@ namespace IngameScript
             if (Append != null && Append.Contains("\n"))
                 Append.Trim();
         }
+    }
 
+    public class SpriteConditional : SpriteData
+    {
+        double _data, _lastData;
+        const char k = '$';
+        Func<bool>[] _conditions;
+        MySprite _default = new MySprite();
+        public override string Data
+        {
+            get { return Data; }
+            set { Data = value; }
+        }
+        public SpriteConditional(SpriteData d)
+        {
+            uID = d.uID;
+            Name = d.Name;
+            Sprite = d.Sprite;
+            Command = d.Command;
+            Priority = d.Priority;
+            Prepend = d.Prepend;
+            Append = d.Append;
+        }
+        public void CreateMappings(string s)
+        {
+            string[] 
+                ln,
+                l = s.Contains("\n") ? s.Split('\n') : new string[] { s };
+            //  ^ split string if applicable
+
+            _conditions = new Func<bool>[l.Length];
+            for(int i = 0; i < l.Length; i++)
+            {
+                // formatting: [0 - data point]$[1 - comparator]$[3 - color/hide]
+                // e.g. 1.234$<=$64FA64 sets color to 64FA64 if data <= 1.234
+
+                ln = l[i].Split(k);            
+                if (ln.Length != 4) continue;
+
+                var d = double.Parse(ln[0]);
+                var b = Condition(ln[1], d);
+                if (ln[3] != "hide")
+                {
+                    var c = iniWrap.Color(ln[3]); // parse color
+                    _conditions[i] = () =>
+                    {
+                        var r = b.Invoke();
+                        if (r) Sprite.Color = c;
+                        return r;
+                    };
+                }
+                else
+                {
+                    _default = Sprite;
+                    _conditions[i] = () =>
+                    {
+                        var r = b.Invoke();
+                        if (r)
+                            Sprite = new MySprite();
+                        else if (Sprite.Data == null)
+                            Sprite = _default;
+                        return r;
+                    };
+                }
+            }
+        }
+
+        Func<bool> Condition(string c, double d)
+        {
+            switch (c)
+            {
+                case "<=":
+                case "=<":
+                    return () => _data <= d;     
+                case ">=":
+                case "=>":
+                    return () => _data >= d;
+                case "=":
+                case "==":
+                default:
+                    return () => _data == d;
+                case "!=":
+                    return () => _data != d;
+            }
+        }
+
+        public override void SetData(double value, string def = "") 
+        {
+            if (_data != _lastData)
+                _lastData = _data;
+        }
+        public override bool CheckUpdate()
+        {
+            var b = _data == _lastData;
+            if (b)
+                for (int i = 0; i < _conditions.Length; i++)
+                    if (_conditions[i].Invoke())
+                        break;
+            return b;
+        }
     }
 }

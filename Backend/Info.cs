@@ -1,10 +1,13 @@
 ﻿using Sandbox.Game;
 using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI.Ingame;
+using SpaceEngineers.Game.ModAPI.Ingame;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using VRage;
 using VRage.Game;
 using VRage.Game.Components.Interfaces;
@@ -36,7 +39,6 @@ namespace IngameScript
 
         protected MyGridProgram Program;
         protected GraphicsManager GCM;
-        protected IMyGridTerminalSystem TerminalSystem;
         protected const char
             cmd = '!',
             bar = 'b',
@@ -52,7 +54,6 @@ namespace IngameScript
         {
             GCM = manager;
             Program = program;
-            TerminalSystem = program.GridTerminalSystem;
             jitSprite.uID = int.MinValue;
             GetBlocks();
         }
@@ -105,9 +106,9 @@ namespace IngameScript
             HydrogenTanks.Clear();
             OxygenTanks.Clear();
             Gens.Clear();
-            TerminalSystem.GetBlocksOfType(HydrogenTanks, (b) => b.IsSameConstructAs(GCM.Me) && b.BlockDefinition.SubtypeId.Contains("Hyd"));
-            TerminalSystem.GetBlocksOfType(OxygenTanks, (b) => !HydrogenTanks.Contains(b) && b.IsSameConstructAs(GCM.Me));
-            TerminalSystem.GetBlocksOfType(Gens, (b) => b.IsSameConstructAs(GCM.Me));
+            GCM.Terminal.GetBlocksOfType(HydrogenTanks, (b) => b.IsSameConstructAs(GCM.Me) && b.BlockDefinition.SubtypeId.Contains("Hyd"));
+            GCM.Terminal.GetBlocksOfType(OxygenTanks, (b) => !HydrogenTanks.Contains(b) && b.IsSameConstructAs(GCM.Me));
+            GCM.Terminal.GetBlocksOfType(Gens, (b) => b.IsSameConstructAs(GCM.Me));
             IceOre = new ItemInfo("Ore", "Ice", Gens.ToList<IMyTerminalBlock>());
         }
 
@@ -582,7 +583,7 @@ namespace IngameScript
         public override void GetBlocks()
         {
             InventoryBlocks.Clear();
-            TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
+            GCM.Terminal.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
             {
                 if (b.BlockDefinition.SubtypeId == "LargeInteriorTurret")
                     return false;
@@ -693,6 +694,30 @@ namespace IngameScript
         #endregion
     }
 
+    public class AviationUtilities : UtilityBase // replacing most of the other shit with this since it's specialized
+    {
+        IMyShipController Reference => GCM.Controller;
+
+        public AviationUtilities(string s)
+        {
+            name = "Avionics";
+        }
+
+        #region UtilityBase
+
+        public override void GetBlocks()
+        {
+            
+        }
+
+        public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
+        {
+            
+        }
+
+        #endregion
+    }
+
     public class BlockInfo<T>// : IInfo
         where T : IMyFunctionalBlock
     {
@@ -725,7 +750,7 @@ namespace IngameScript
             {
                 p.CustomData(GCM.Me);
                 std = p.String(tag, fmat, "0000");
-                TerminalSystem.GetBlocksOfType(JumpDrives, b => b.IsSameConstructAs(Program.Me));
+                GCM.Terminal.GetBlocksOfType(JumpDrives, b => b.IsSameConstructAs(Program.Me));
             }
         }
 
@@ -868,22 +893,18 @@ namespace IngameScript
         }
     }
 
+    // adrn
     public class ThrustUtilities : UtilityBase
     {
         readonly string tag;
-        const string
-            F = "fwd",
-            B = "bwd",
-            L = "lft",
-            R = "rgt",
-            U = "upw",
-            D = "dwn";
-        List<IMyThrust> AllThrusters = new List<IMyThrust>();
-        SortedList<Base6Directions.Direction, Info> groups = new SortedList<Base6Directions.Direction, Info>();
-        Dictionary<Base6Directions.Direction, IMyThrust[]> dirThrust = new Dictionary<Base6Directions.Direction, IMyThrust[]>();
-        Dictionary<Base6Directions.Direction, int> maxThrust = new Dictionary<Base6Directions.Direction, int>();
-        Dictionary<int, Base6Directions.Direction> idToDir = new Dictionary<int, Base6Directions.Direction>();
-        Dictionary<int, IMyThrust> singles = new Dictionary<int, IMyThrust>();
+        double totalFuelCap, lastFuel;
+        DateTime fuelTS;
+        Info Fuel;
+        List<IMyGasTank> FuelTanks = new List<IMyGasTank>();
+        Dictionary<string, long[]> EngineMappings = new Dictionary<string, long[]>(); // name, (0) (1) (2)
+        Dictionary<long, IMyAirVent> Intakes = new Dictionary<long, IMyAirVent>(); // (0) engine intake
+        Dictionary<long, IMyPowerProducer> Generators = new Dictionary<long, IMyPowerProducer>(); // (1) main "engine" piece
+        Dictionary<long, IMyThrust> Engines = new Dictionary<long, IMyThrust>(); // (2) thruster piece
         Vector2 _circl = new Vector2();
 
         public ThrustUtilities(string t)
@@ -896,11 +917,10 @@ namespace IngameScript
 
         public override void GetBlocks()
         {
-            groups.Clear();
-            AllThrusters.Clear();
-            maxThrust.Clear();
-            dirThrust.Clear();
-            TerminalSystem.GetBlocksOfType(AllThrusters, (thrust) => thrust.IsSameConstructAs(GCM.Me));
+            
+            FuelTanks.Clear();
+            GCM.Terminal.GetBlocksOfType(FuelTanks, b => b.IsSameConstructAs(GCM.Me));
+           
 
             if (GCM.Controller != null)
             {
@@ -908,7 +928,7 @@ namespace IngameScript
                 bool main = GCM.Controller.IsMainCockpit;
                 if (!main)
                 {
-                    TerminalSystem.GetBlocksOfType<IMyShipController>(null, b =>
+                    GCM.Terminal.GetBlocksOfType<IMyShipController>(null, b =>
                     {
                         if (b.IsMainCockpit)
                             temp = b;
@@ -917,15 +937,7 @@ namespace IngameScript
                     GCM.Controller.IsMainCockpit = true;
                 }
                 var list = new List<IMyThrust>();
-                createGroup(ref list, getDir(F));
-                createGroup(ref list, getDir(B));
-                createGroup(ref list, getDir(L));
-                createGroup(ref list, getDir(R));
-                createGroup(ref list, getDir(U));
-                createGroup(ref list, getDir(D));
 
-                foreach (var dir in dirThrust.Keys)
-                    groups.Add(dir, new Info("thr" + dir, () => getThrust(dir)));
                 if (!main)
                 {
                     if (temp != null)
@@ -934,40 +946,10 @@ namespace IngameScript
                 }
             }
         }
-
         public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
+        // JIT+
         {
-            // JIT
-            getThrust(getDir(F));
-
-            commands.Add("!cirthr%", b =>
-            {
-                bool k = singles.ContainsKey(b.uID);
-                if (GCM.justStarted && !k)
-                    TerminalSystem.GetBlocksOfType<IMyThrust>(null, t =>
-                    {
-                        if (t.CustomName.Contains(b.Name))
-                        {
-                            singles[b.uID] = t;
-                            Lib.GraphStorage[b.uID] = MyTuple.Create(false, b.Sprite.Size?.X);
-                        }
-                        return false;
-                    });
-                _circl.X = _circl.Y = (.625f + singles[b.uID].CurrentThrust / singles[b.uID].MaxThrust) * Lib.GraphStorage[b.uID].Item2.Value;
-                b.Sprite.Size = _circl;
-            });
-            commands.Add("!curthr%", b =>
-            {
-                bool k = singles.ContainsKey(b.uID);
-                if (GCM.justStarted && !k)
-                    TerminalSystem.GetBlocksOfType<IMyThrust>(null, t =>
-                    {
-                        if (t.CustomName.Contains(b.Data))
-                            singles[b.uID] = t;
-                        return false;
-                    });
-                b.Data = singles[b.uID].CurrentThrustPercentage.ToString("#0.#%");
-            });
+            Fuel = new Info("Fuel", () => TankStatus(false));
             commands.Add("!movethr", b => curThrust(ref b));
             commands.Add("!movethr%", b => curThrust(ref b, true));
             commands.Add("!a", b => curThrust(ref b, a: true));
@@ -975,29 +957,34 @@ namespace IngameScript
 
         public override void Update()
         {
-            foreach (var g in groups.Values)
-                g.Update();
+            
+            Fuel.Update();
         }
 
         #endregion
-        Base6Directions.Direction getDir(string s)
+
+        double TankStatus(bool pct)
         {
-            switch (s)
+            var amt = 0d;
+            var total = amt;
+            for (int i = 0; i < FuelTanks.Count; i++)
             {
-                case F:
-                default:
-                    return Base6Directions.Direction.Forward;
-                case B:
-                    return Base6Directions.Direction.Backward;
-                case L:
-                    return Base6Directions.Direction.Left;
-                case R:
-                    return Base6Directions.Direction.Right;
-                case U:
-                    return Base6Directions.Direction.Up;
-                case D:
-                    return Base6Directions.Direction.Down;
+                amt += FuelTanks[i].FilledRatio * FuelTanks[i].Capacity;
+                total += FuelTanks[i].Capacity;
             }
+            return pct ? amt / total : amt;
+        }
+
+        TimeSpan FuelBurnTime()
+        {
+            var ts = DateTime.Now;
+            var rate = MathHelperD.Clamp(lastFuel - Fuel.Data, 1E-50, double.MaxValue) / (ts - fuelTS).TotalSeconds;
+            var value = Fuel.Data / rate;
+            lastFuel = Fuel.Data;
+            fuelTS = ts;
+            if (rate < 1E-15 || double.IsNaN(value) || value > 1E5)
+                return TimeSpan.Zero;
+            return TimeSpan.FromSeconds(value);
         }
 
         void createGroup(ref List<IMyThrust> l, Base6Directions.Direction dir)
@@ -1082,10 +1069,10 @@ namespace IngameScript
             Reactors.Clear();
             Engines.Clear();
             AllPower.Clear();
-            TerminalSystem.GetBlocksOfType(Batteries, (battery) => battery.IsSameConstructAs(GCM.Me));
-            TerminalSystem.GetBlocksOfType(Reactors, (reactor) => reactor.IsSameConstructAs(GCM.Me));
-            TerminalSystem.GetBlocksOfType(Engines, (generator) => generator.IsSameConstructAs(GCM.Me) && generator.CustomName.Contains("Engine"));
-            TerminalSystem.GetBlocksOfType(AllPower, (power) => power.IsSameConstructAs(GCM.Me));
+            GCM.Terminal.GetBlocksOfType(Batteries, (battery) => battery.IsSameConstructAs(GCM.Me));
+            GCM.Terminal.GetBlocksOfType(Reactors, (reactor) => reactor.IsSameConstructAs(GCM.Me));
+            GCM.Terminal.GetBlocksOfType(Engines, (generator) => generator.IsSameConstructAs(GCM.Me) && generator.CustomName.Contains("Engine"));
+            GCM.Terminal.GetBlocksOfType(AllPower, (power) => power.IsSameConstructAs(GCM.Me));
         }
 
         public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
