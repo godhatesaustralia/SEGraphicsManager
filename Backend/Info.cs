@@ -1,7 +1,6 @@
 ﻿using Sandbox.Game;
 using Sandbox.Game.EntityComponents;
 using Sandbox.ModAPI.Ingame;
-using SpaceEngineers.Game.ModAPI.Ingame;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
@@ -707,554 +706,312 @@ namespace IngameScript
 
         public override void GetBlocks()
         {
-            
+
         }
 
         public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
         {
-            
-        }
-
-        #endregion
-    }
-
-    public class BlockInfo<T>// : IInfo
-        where T : IMyFunctionalBlock
-    {
-
-    }
-
-    public class FlightUtilities : UtilityBase
-    {
-        List<IMyJumpDrive> JumpDrives = new List<IMyJumpDrive>();
-        double lastDist, maxDist, lastAccel, maxAccel;
-        const double dev = 0.01;
-        readonly string tag, ctrl, fmat;
-        string std;
-        DateTime stopTS, accelTS; // fuck you
-        Vector3D VZed = Vector3D.Zero, lastVel, grav;
-        Info jump;
-
-        public FlightUtilities(string s, string f = "flightFMAT")
-        {
-            name = "Flight";
-            tag = s;
-            fmat = f;
-        }
-
-        #region UtilityBase
-
-        public override void GetBlocks()
-        {
-            using (var p = new iniWrap())
-            {
-                p.CustomData(GCM.Me);
-                std = p.String(tag, fmat, "0000");
-                GCM.Terminal.GetBlocksOfType(JumpDrives, b => b.IsSameConstructAs(Program.Me));
-            }
-        }
-
-        public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
-        {
-
-            jump = new Info("jd%", JumpCharge);
-            // JIT
-            jump.Update();
-            GetHorizonAngle();
-            Accel();
-            GetAlt(MyPlanetElevation.Sealevel);
-            StoppingDist();
-
-            commands.Add("!horiz", b =>
-                 Validate(GetHorizonAngle(), ref b, "-#0.##; +#0.##" + "°"));
-
-            commands.Add("!c-alt", b =>
-                Validate(GetAlt(MyPlanetElevation.Sealevel), ref b, std));
-
-            commands.Add("!s-alt", b =>
-                Validate(GetAlt(MyPlanetElevation.Surface), ref b, std));
-
-            commands.Add("!stop", b =>
-                Validate(StoppingDist(), ref b, std));
-
-            commands.Add("!accel", b => Validate(Accel(), ref b, std));
-
-            commands.Add("!damp", b =>
-            { // this should not be a problem (famous last words)
-                b.Data = GCM.Controller.DampenersOverride ? "ON" : "OFF";
-            });
-
-            commands.Add("!jcharge%", b => b.SetData(jump.Data, "#0.#%"));
-
-            commands.Add("!jchargeb", b =>
-            {
-                if (GCM.justStarted)
-                    Lib.CreateBarGraph(ref b);
-                Lib.UpdateBarGraph(ref b, jump.Data);
-            });
 
         }
 
         public override void Update()
         {
-            jump.Update();
+
         }
+
 
         #endregion
-
-        bool GravCheck(out Vector3D grav) //wanted something nice and neat
+        public class BlockInfo<T>// : IInfo
+            where T : IMyFunctionalBlock
         {
-            grav = GCM.Controller.GetNaturalGravity();
-            if (grav == VZed)
-                return false;
-            return true;
+
         }
+    }
 
-        double GetHorizonAngle()
+        public class FlightUtilities : UtilityBase
         {
-            if (!GravCheck(out grav))
-                return bad;
-            if (grav == VZed)
-                return bad;
-            grav.Normalize();
-            return Math.Asin(MathHelper.Clamp(GCM.Controller.WorldMatrix.Forward.Dot(grav), -1, 1));
-        }
+            List<IMyJumpDrive> JumpDrives = new List<IMyJumpDrive>();
+            double lastDist, maxDist, lastAccel, maxAccel;
+            const double dev = 0.01;
+            readonly string tag, ctrl, fmat;
+            string std;
+            DateTime stopTS, accelTS; // fuck you
+            Vector3D VZed = Vector3D.Zero, lastVel, grav;
+            Info jump;
 
-        double GetAlt(MyPlanetElevation elevation)
-        {
-            if (!GravCheck(out grav))
-                return bad;
-            var alt = 0d;
-            if (GCM.Controller.TryGetPlanetElevation(elevation, out alt))
-                return alt;
-            return bad;
-        }
-
-        double Accel()
-        {
-            var ret = 0d;
-            var ts = DateTime.Now;
-            if (GCM.justStarted)
-                return bad;
-            var current = GCM.Controller.GetShipVelocities().LinearVelocity;
-
-            if (current.Length() < 0.037)
+            public FlightUtilities(string s, string f = "flightFMAT")
             {
-                lastAccel = 0;
+                name = "Flight";
+                tag = s;
+                fmat = f;
+            }
+
+            #region UtilityBase
+
+            public override void GetBlocks()
+            {
+                using (var p = new iniWrap())
+                {
+                    p.CustomData(GCM.Me);
+                    std = p.String(tag, fmat, "0000");
+                    GCM.Terminal.GetBlocksOfType(JumpDrives, b => b.IsSameConstructAs(Program.Me));
+                }
+            }
+
+            public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
+            {
+
+                jump = new Info("jd%", JumpCharge);
+                // JIT
+                jump.Update();
+                GetHorizonAngle();
+                Accel();
+                GetAlt(MyPlanetElevation.Sealevel);
+                StoppingDist();
+
+                commands.Add("!horiz", b =>
+                     Validate(GetHorizonAngle(), ref b, "-#0.##; +#0.##" + "°"));
+
+                commands.Add("!c-alt", b =>
+                    Validate(GetAlt(MyPlanetElevation.Sealevel), ref b, std));
+
+                commands.Add("!s-alt", b =>
+                    Validate(GetAlt(MyPlanetElevation.Surface), ref b, std));
+
+                commands.Add("!stop", b =>
+                    Validate(StoppingDist(), ref b, std));
+
+                commands.Add("!accel", b => Validate(Accel(), ref b, std));
+
+                commands.Add("!damp", b =>
+                { // this should not be a problem (famous last words)
+                    b.Data = GCM.Controller.DampenersOverride ? "ON" : "OFF";
+                });
+
+                commands.Add("!jcharge%", b => b.SetData(jump.Data, "#0.#%"));
+
+                commands.Add("!jchargeb", b =>
+                {
+                    if (GCM.justStarted)
+                        Lib.CreateBarGraph(ref b);
+                    Lib.UpdateBarGraph(ref b, jump.Data);
+                });
+
+            }
+
+            public override void Update()
+            {
+                jump.Update();
+            }
+
+            #endregion
+
+            bool GravCheck(out Vector3D grav) //wanted something nice and neat
+            {
+                grav = GCM.Controller.GetNaturalGravity();
+                if (grav == VZed)
+                    return false;
+                return true;
+            }
+
+            double GetHorizonAngle()
+            {
+                if (!GravCheck(out grav))
+                    return bad;
+                if (grav == VZed)
+                    return bad;
+                grav.Normalize();
+                return Math.Asin(MathHelper.Clamp(GCM.Controller.WorldMatrix.Forward.Dot(grav), -1, 1));
+            }
+
+            double GetAlt(MyPlanetElevation elevation)
+            {
+                if (!GravCheck(out grav))
+                    return bad;
+                var alt = 0d;
+                if (GCM.Controller.TryGetPlanetElevation(elevation, out alt))
+                    return alt;
                 return bad;
             }
-            var mag = (current - lastVel).Length();
-            if (mag > dev)
-                ret += mag / (ts - accelTS).TotalSeconds;
 
-            if (ret > maxAccel) maxAccel = ret;
-            lastAccel = ret;
-            accelTS = ts;
-            return ret <= dev ? maxAccel : ret;
-        }
-
-        double StoppingDist()
-        {
-            double
-                ret = lastDist,
-                a = 0;
-            var ts = DateTime.Now;
-
-            var current = GCM.Controller.GetShipVelocities().LinearVelocity;
-            if (!GCM.justStarted)
+            double Accel()
             {
-                if (!GCM.Controller.DampenersOverride || current.Length() < 0.037) return bad;
-                var mag = (lastVel - current).Length();
+                var ret = 0d;
+                var ts = DateTime.Now;
+                if (GCM.justStarted)
+                    return bad;
+                var current = GCM.Controller.GetShipVelocities().LinearVelocity;
+
+                if (current.Length() < 0.037)
+                {
+                    lastAccel = 0;
+                    return bad;
+                }
+                var mag = (current - lastVel).Length();
                 if (mag > dev)
-                {
-                    a = mag / (ts - stopTS).TotalSeconds;
-                    ret = current.Length() * current.Length() / (2 * a);
-                    lastDist = ret;
-                }
+                    ret += mag / (ts - accelTS).TotalSeconds;
+
+                if (ret > maxAccel) maxAccel = ret;
+                lastAccel = ret;
+                accelTS = ts;
+                return ret <= dev ? maxAccel : ret;
             }
-            if (ret > maxDist) maxDist = ret;
-            lastVel = current;
-            stopTS = ts;
-            return a <= dev ? maxDist : ret;
-        }
 
-        double JumpCharge()
-        {
-            if (JumpDrives.Count == 0) return 0f;
-            float charge, max = 0f;
-            charge = max;
-            for (int i = 0; i < JumpDrives.Count; i++)
+            double StoppingDist()
             {
-                //if (JumpDrives[i] == null) continue;
-                charge += JumpDrives[i].CurrentStoredPower;
-                max += JumpDrives[i].MaxStoredPower;
-            }
-            return charge / max;
-        }
-    }
+                double
+                    ret = lastDist,
+                    a = 0;
+                var ts = DateTime.Now;
 
-    // adrn
-    public class ThrustUtilities : UtilityBase
-    {
-        readonly string tag;
-        double totalFuelCap, lastFuel;
-        DateTime fuelTS;
-        Info Fuel;
-        List<IMyGasTank> FuelTanks = new List<IMyGasTank>();
-        Dictionary<string, long[]> EngineMappings = new Dictionary<string, long[]>(); // name, (0) (1) (2)
-        Dictionary<long, IMyAirVent> Intakes = new Dictionary<long, IMyAirVent>(); // (0) engine intake
-        Dictionary<long, IMyPowerProducer> Generators = new Dictionary<long, IMyPowerProducer>(); // (1) main "engine" piece
-        Dictionary<long, IMyThrust> Engines = new Dictionary<long, IMyThrust>(); // (2) thruster piece
-        Vector2 _circl = new Vector2();
-
-        public ThrustUtilities(string t)
-        {
-            name = "Thrust";
-            tag = t;
-        }
-
-        #region UtilityBase
-
-        public override void GetBlocks()
-        {
-            
-            FuelTanks.Clear();
-            GCM.Terminal.GetBlocksOfType(FuelTanks, b => b.IsSameConstructAs(GCM.Me));
-           
-
-            if (GCM.Controller != null)
-            {
-                IMyShipController temp = null;
-                bool main = GCM.Controller.IsMainCockpit;
-                if (!main)
+                var current = GCM.Controller.GetShipVelocities().LinearVelocity;
+                if (!GCM.justStarted)
                 {
-                    GCM.Terminal.GetBlocksOfType<IMyShipController>(null, b =>
+                    if (!GCM.Controller.DampenersOverride || current.Length() < 0.037) return bad;
+                    var mag = (lastVel - current).Length();
+                    if (mag > dev)
                     {
-                        if (b.IsMainCockpit)
-                            temp = b;
-                        return false;
-                    });
-                    GCM.Controller.IsMainCockpit = true;
+                        a = mag / (ts - stopTS).TotalSeconds;
+                        ret = current.Length() * current.Length() / (2 * a);
+                        lastDist = ret;
+                    }
                 }
-                var list = new List<IMyThrust>();
+                if (ret > maxDist) maxDist = ret;
+                lastVel = current;
+                stopTS = ts;
+                return a <= dev ? maxDist : ret;
+            }
 
-                if (!main)
+            double JumpCharge()
+            {
+                if (JumpDrives.Count == 0) return 0f;
+                float charge, max = 0f;
+                charge = max;
+                for (int i = 0; i < JumpDrives.Count; i++)
                 {
-                    if (temp != null)
-                        temp.IsMainCockpit = true;
-                    GCM.Controller.IsMainCockpit = false;
+                    //if (JumpDrives[i] == null) continue;
+                    charge += JumpDrives[i].CurrentStoredPower;
+                    max += JumpDrives[i].MaxStoredPower;
                 }
+                return charge / max;
             }
         }
-        public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
-        // JIT+
-        {
-            Fuel = new Info("Fuel", () => TankStatus(false));
-            commands.Add("!movethr", b => curThrust(ref b));
-            commands.Add("!movethr%", b => curThrust(ref b, true));
-            commands.Add("!a", b => curThrust(ref b, a: true));
-        }
 
-        public override void Update()
+        public class PowerUtilities : UtilityBase
         {
-            
-            Fuel.Update();
-        }
-
-        #endregion
-
-        double TankStatus(bool pct)
-        {
-            var amt = 0d;
-            var total = amt;
-            for (int i = 0; i < FuelTanks.Count; i++)
+            List<IMyBatteryBlock> Batteries = new List<IMyBatteryBlock>();
+            List<IMyReactor> Reactors = new List<IMyReactor>();
+            List<IMyPowerProducer>
+                Engines = new List<IMyPowerProducer>(),
+                AllPower = new List<IMyPowerProducer>();
+            UseRate U;
+            ItemInfo Fuel;
+            double pmax;
+            Info batt, pwr;
+            const string I = "ON", O = "OFF", ur = "Ingot!Uranium";
+            public PowerUtilities()
             {
-                amt += FuelTanks[i].FilledRatio * FuelTanks[i].Capacity;
-                total += FuelTanks[i].Capacity;
+                name = "Power";
+                U = new UseRate(ur);
             }
-            return pct ? amt / total : amt;
-        }
-
-        TimeSpan FuelBurnTime()
-        {
-            var ts = DateTime.Now;
-            var rate = MathHelperD.Clamp(lastFuel - Fuel.Data, 1E-50, double.MaxValue) / (ts - fuelTS).TotalSeconds;
-            var value = Fuel.Data / rate;
-            lastFuel = Fuel.Data;
-            fuelTS = ts;
-            if (rate < 1E-15 || double.IsNaN(value) || value > 1E5)
-                return TimeSpan.Zero;
-            return TimeSpan.FromSeconds(value);
-        }
-
-        void createGroup(ref List<IMyThrust> l, Base6Directions.Direction dir)
-        {
-            l.Clear();
-            var v = Base6Directions.GetIntVector(dir);
-            foreach (var t in AllThrusters)
-                if (t.GridThrustDirection == v)
-                    l.Add(t);
-
-            // you never know...
-            if (l.Count > 0)
+            #region UtilityBase
+            public override void Reset(GraphicsManager m, MyGridProgram p)
             {
-                var a = l.ToArray();
-                int sum = 0, i = 0;
-                for (; i < a.Length; i++)
-                    sum += Convert.ToInt32(a[i].MaxThrust);
-                dirThrust.Add(dir, a);
-                maxThrust.Add(dir, sum);
+                base.Reset(m, p);
+                var a = ur.Split(cmd);
+                Fuel = new ItemInfo(a[0], a[1], Reactors.ToList<IMyTerminalBlock>());
             }
-        }
-        double getThrust(Base6Directions.Direction dir)
-        {
-            var ret = 0d;
-            if (!dirThrust.ContainsKey(dir))
-                return ret;
-            var a = dirThrust[dir];
-            for (int i = 0; i < a.Length; i++)
-                ret += a[i].CurrentThrust;
-            return ret;
-        }
-        void curThrust(ref SpriteData b, bool pct = false, bool a = false)
-        {
-            var d = -GCM.Controller?.MoveIndicator;
-            if (d == Vector3.Zero || d == null)
+
+            public override void GetBlocks()
             {
-                b.Data = invalid;
-                return;
+                Batteries.Clear();
+                Reactors.Clear();
+                Engines.Clear();
+                AllPower.Clear();
+                GCM.Terminal.GetBlocksOfType(Batteries, (battery) => battery.IsSameConstructAs(GCM.Me));
+                GCM.Terminal.GetBlocksOfType(Reactors, (reactor) => reactor.IsSameConstructAs(GCM.Me));
+                GCM.Terminal.GetBlocksOfType(Engines, (generator) => generator.IsSameConstructAs(GCM.Me) && generator.CustomName.Contains("Engine"));
+                GCM.Terminal.GetBlocksOfType(AllPower, (power) => power.IsSameConstructAs(GCM.Me));
             }
-            var dir = Base6Directions.GetClosestDirection(d.Value);
-            var cur = groups[dir].Data;
-            if (pct)
-                b.SetData(cur / maxThrust[dir], "#0.#%");
-            else if (a)
-                b.SetData(cur / GCM.Controller.CalculateShipMass().TotalMass, "#0.#");
-            else
-                b.SetData(groups[dir].Data);
+
+            public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
+            {
+                batt = new Info("bc%", BatteryCharge);
+                pwr = new Info("pwr", Output);
+
+                commands.Add("!bcharge%", (b) =>
+                    Validate(batt.Data, ref b, "#0.#%"));
+
+                commands.Add("!bchargeb", b =>
+                {
+                    if (GCM.justStarted)
+                        Lib.CreateBarGraph(ref b);
+                    Lib.UpdateBarGraph(ref b, batt.Data);
+                });
+                commands.Add("!gridgen%", b => b.SetData(pwr.Data / pmax, "#0.#%"));
+                commands.Add("!fuel", b => b.SetData(Fuel.Data, Fuel.Format));
+                commands.Add("!fission", b =>
+                {
+                    var rate = 0d;
+                    if (GCM.justStarted)
+                        b.Data = InventoryUtilities.TryGetUseRate(ref U, ref Fuel, out rate) ? $"{rate:000.0} KG/S" : "0 KG/S";
+                });
+                commands.Add("!gridcap", b => b.SetData(1 - (pwr.Data / pmax), "#0.#%"));
+            }
+
+            public override void Update()
+            {
+                Fuel.Update();
+                batt.Update();
+                pwr.Update();
+            }
+
+            #endregion
+            double BatteryCharge()
+            {
+                if (Batteries.Count == 0)
+                    return bad;
+                var charge = 0d;
+                var total = charge;
+                for (int i = 0; i < Batteries.Count; i++)
+                {
+                    //if (battery == null) continue;
+                    charge += Batteries[i].CurrentStoredPower;
+                    total += Batteries[i].MaxStoredPower;
+                }
+                return (charge / total);
+            }
+
+            double Output()
+            {
+                var sum = 0f;
+                pmax = 0;
+                for (int i = 0; i < AllPower.Count; i++)
+                {
+                    if (!AllPower[i].IsFunctional || !AllPower[i].Enabled)
+                        continue;
+                    sum += AllPower[i].CurrentOutput;
+                    pmax += AllPower[i].MaxOutput;
+                }
+                return sum;
+
+            }
         }
 
+        //public class WeaponUtilities : UtilityBase
+        //{
+        //   // MyDefinitionId _nrg = new MyDefinitionId()
+        //    Dictionary<long, string[]> wpnTags = new Dictionary<long, string[]>();
+        //    Dictionary<long, Info> wpnData = new Dictionary<long, Info>(); // sprite uid to cached gun stats
+        //    Dictionary<long, IMyUserControllableGun> wpns = new Dictionary<long, IMyUserControllableGun>(); // eid to gun
+        //    public WeaponUtilities()
+        //    {
+        //        name = "Weapons";
+        //        GCM.Terminal.GetBlocksOfType<IMyUserControllableGun>(null, b =>
+        //        {
+        //            var c = b.Components.Get<MyResourceSinkComponent>();
+        //            return false;
+        //        });
+        //    }
+        //}
     }
-
-
-
-    public class PowerUtilities : UtilityBase
-    {
-        List<IMyBatteryBlock> Batteries = new List<IMyBatteryBlock>();
-        List<IMyReactor> Reactors = new List<IMyReactor>();
-        List<IMyPowerProducer>
-            Engines = new List<IMyPowerProducer>(),
-            AllPower = new List<IMyPowerProducer>();
-        UseRate U;
-        ItemInfo Fuel;
-        double pmax;
-        Info batt, pwr;
-        const string I = "ON", O = "OFF", ur = "Ingot!Uranium";
-        public PowerUtilities()
-        {
-            name = "Power";
-            U = new UseRate(ur);
-        }
-        #region UtilityBase
-        public override void Reset(GraphicsManager m, MyGridProgram p)
-        {
-            base.Reset(m, p);
-            var a = ur.Split(cmd);
-            Fuel = new ItemInfo(a[0], a[1], Reactors.ToList<IMyTerminalBlock>());
-        }
-
-        public override void GetBlocks()
-        {
-            Batteries.Clear();
-            Reactors.Clear();
-            Engines.Clear();
-            AllPower.Clear();
-            GCM.Terminal.GetBlocksOfType(Batteries, (battery) => battery.IsSameConstructAs(GCM.Me));
-            GCM.Terminal.GetBlocksOfType(Reactors, (reactor) => reactor.IsSameConstructAs(GCM.Me));
-            GCM.Terminal.GetBlocksOfType(Engines, (generator) => generator.IsSameConstructAs(GCM.Me) && generator.CustomName.Contains("Engine"));
-            GCM.Terminal.GetBlocksOfType(AllPower, (power) => power.IsSameConstructAs(GCM.Me));
-        }
-
-        public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
-        {
-            batt = new Info("bc%", BatteryCharge);
-            pwr = new Info("pwr", Output);
-
-            commands.Add("!bcharge%", (b) =>
-                Validate(batt.Data, ref b, "#0.#%"));
-
-            commands.Add("!bchargeb", b =>
-            {
-                if (GCM.justStarted)
-                    Lib.CreateBarGraph(ref b);
-                Lib.UpdateBarGraph(ref b, batt.Data);
-            });
-            commands.Add("!gridgen%", b => b.SetData(pwr.Data / pmax, "#0.#%"));
-            commands.Add("!fuel", b => b.SetData(Fuel.Data, Fuel.Format));
-            commands.Add("!fission", b =>
-            {
-                var rate = 0d;
-                if (GCM.justStarted)
-                    b.Data = InventoryUtilities.TryGetUseRate(ref U, ref Fuel, out rate) ? $"{rate:000.0} KG/S" : "0 KG/S";
-            });
-            commands.Add("!gridcap", b => b.SetData(1 - (pwr.Data / pmax), "#0.#%"));
-        }
-
-        public override void Update()
-        {
-            Fuel.Update();
-            batt.Update();
-            pwr.Update();
-        }
-
-        #endregion
-        double BatteryCharge()
-        {
-            if (Batteries.Count == 0)
-                return bad;
-            var charge = 0d;
-            var total = charge;
-            for (int i = 0; i < Batteries.Count; i++)
-            {
-                //if (battery == null) continue;
-                charge += Batteries[i].CurrentStoredPower;
-                total += Batteries[i].MaxStoredPower;
-            }
-            return (charge / total);
-        }
-
-        double Output()
-        {
-            var sum = 0f;
-            pmax = 0;
-            for (int i = 0; i < AllPower.Count; i++)
-            {
-                if (!AllPower[i].IsFunctional || !AllPower[i].Enabled)
-                    continue;
-                sum += AllPower[i].CurrentOutput;
-                pmax += AllPower[i].MaxOutput;
-            }
-            return sum;
-
-        }
-    }
-
-    //public class WeaponUtilities : UtilityBase
-    //{
-    //   // MyDefinitionId _nrg = new MyDefinitionId()
-    //    Dictionary<long, string[]> wpnTags = new Dictionary<long, string[]>();
-    //    Dictionary<long, Info> wpnData = new Dictionary<long, Info>(); // sprite uid to cached gun stats
-    //    Dictionary<long, IMyUserControllableGun> wpns = new Dictionary<long, IMyUserControllableGun>(); // eid to gun
-    //    public WeaponUtilities()
-    //    {
-    //        name = "Weapons";
-    //        GCM.Terminal.GetBlocksOfType<IMyUserControllableGun>(null, b =>
-    //        {
-    //            var c = b.Components.Get<MyResourceSinkComponent>();
-    //            return false;
-    //        });
-    //    }
-    //}
-
-    // TODO: THIS SYSTEM IS ASS
-    //public class CoreWeaponUtilities : UtilityBase
-    //{
-    //    Dictionary<long, MyTuple<string, IMyTerminalBlock[]>> WeaponGroups = new Dictionary<long, MyTuple<string, IMyTerminalBlock[]>>();
-    //    Dictionary<long, string> tagStorage = new Dictionary<long, string>();
-    //    List<IMyTerminalBlock> wcWeapons = new List<IMyTerminalBlock>();
-    //    WCPBAPI api = null;
-    //    bool man = false;
-
-    //    public CoreWeaponUtilities()
-    //    {
-    //        name = "Weapons";
-    //    }
-
-    //    #region UtilityBase
-    //    public override void Reset(GraphicsManager m, MyGridProgram p)
-    //    {
-    //        base.Reset(m, p);
-    //        WeaponGroups.Clear();
-    //        man = true;
-    //    }
-
-    //    public override void Bind(ref Dictionary<string, Action<SpriteData>> commands)
-    //    {
-    //        commands.Add("!wpnrdy", (b) =>
-    //        {
-    //            if (WCPBAPI.Activate(Program.Me, ref api))
-    //            {
-    //                if (!WeaponGroups.ContainsKey(b.uID)) AddWeaponGroup(b);
-    //                else UpdateWeaponReady(ref b);
-    //            }
-    //        });
-    //        commands.Add("!tgt", (b) =>
-    //        {
-    //            if (WCPBAPI.Activate(Program.Me, ref api))
-    //            {
-    //                var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
-    //                b.Data = focus.HasValue ? focus.Value.Name : "NO TARGET";
-    //            }
-    //        });
-
-    //        commands.Add("!tgtdist", (b) =>
-    //        {
-    //            if (WCPBAPI.Activate(Program.Me, ref api))
-    //            {
-    //                var focus = api.GetAiFocus(Program.Me.CubeGrid.EntityId);
-    //                b.Data = focus.HasValue ? (focus.Value.Position - Program.Me.CubeGrid.GetPosition()).Length().ToString("4:####") : "NO TARGET";
-    //            }
-    //        });
-
-    //        commands.Add("!heats%", (b) =>
-    //        {
-    //            if (WCPBAPI.Activate(Program.Me, ref api))
-    //            {
-    //                // todo
-    //            }
-    //        });
-    //    }
-
-    //    public override void GetBlocks()
-    //    {
-    //        if (!WCPBAPI.Activate(Program.Me, ref api))
-    //            return;
-    //        wcWeapons.Clear();
-    //        foreach (var t in tagStorage.Values)
-    //            TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
-    //            {
-    //                if (b.IsSameConstructAs(Program.Me) && b.CustomName.Contains(t))
-    //                    wcWeapons.Add(b);
-    //                return true;
-    //            });
-    //    }
-
-    //    public override void CheckUpdate() { }
-
-    //    #endregion
-    //    void AddWeaponGroup(SpriteData d)
-    //    {
-    //        var list = new List<IMyTerminalBlock>();
-    //        string[] dat = d.Data.Split(cmd);
-    //        if (!tagStorage.ContainsKey(d.uID))
-    //            tagStorage.Add(d.uID, dat[0]);
-    //        TerminalSystem.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
-    //        {
-    //            if (b.IsSameConstructAs(Program.Me) && b.CustomName.Contains(dat[0]))
-    //                list.Add(b);
-    //            return true;
-    //        });
-    //        if (list.Count > 0) WeaponGroups.Add(d.uID, new MyTuple<string, IMyTerminalBlock[]>(dat[1], list.ToArray()));
-    //    }
-
-    //    void UpdateWeaponReady(ref SpriteData d)
-    //    {
-    //        if (api == null) return;
-    //        int count = 0;
-    //        foreach (var wpn in WeaponGroups[d.uID].Item2)
-    //            if (api.IsWeaponReadyToFire(wpn)) count++;
-    //        d.Data = $"{WeaponGroups[d.uID].Item1} {count}/{WeaponGroups[d.uID].Item2.Length} RDY";
-    //    }
-
-    //}
-}

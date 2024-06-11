@@ -35,8 +35,6 @@ namespace IngameScript
             set { Sprite.Data = value; }
         }
 
-        public SpriteData[] Children;
-
         public bool Builder { get; private set; }
 
         #endregion
@@ -80,6 +78,7 @@ namespace IngameScript
             Format = format;
             SetFlags(cmd);
         }
+
         public virtual void SetData(double value, string def = "")
         {
             if (isList || noFormat)
@@ -119,16 +118,17 @@ namespace IngameScript
         }
     }
 
+    // this is genuinely the worst object i have ever made
     public class SpriteConditional : SpriteData
     {
         double _data, _lastData;
         const char k = '$';
         Func<bool>[] _conditions;
-        MySprite _default = new MySprite();
+        MySprite _default;
         public override string Data
         {
             get { return Data; }
-            set { Data = value; }
+            set { }
         }
         public SpriteConditional(SpriteData d)
         {
@@ -137,8 +137,6 @@ namespace IngameScript
             Sprite = d.Sprite;
             Command = d.Command;
             Priority = d.Priority;
-            Prepend = d.Prepend;
-            Append = d.Append;
         }
         public void CreateMappings(string s)
         {
@@ -152,15 +150,15 @@ namespace IngameScript
             {
                 // formatting: [0 - data point]$[1 - comparator]$[3 - color/hide]
                 // e.g. 1.234$<=$64FA64 sets color to 64FA64 if data <= 1.234
-
-                ln = l[i].Split(k);            
-                if (ln.Length != 4) continue;
+                
+                ln = l[i].Split(k);
+                if (ln.Length != 3) continue;
 
                 var d = double.Parse(ln[0]);
                 var b = Condition(ln[1], d);
-                if (ln[3] != "hide")
+                if (ln[2] != "hide")
                 {
-                    var c = iniWrap.Color(ln[3]); // parse color
+                    var c = iniWrap.Color(ln[2]); // parse color
                     _conditions[i] = () =>
                     {
                         var r = b.Invoke();
@@ -175,7 +173,10 @@ namespace IngameScript
                     {
                         var r = b.Invoke();
                         if (r)
+                        {
                             Sprite = new MySprite();
+                            _lastData = _data;
+                        }
                         else if (Sprite.Data == null)
                             Sprite = _default;
                         return r;
@@ -188,33 +189,37 @@ namespace IngameScript
         {
             switch (c)
             {
+                case "=":
+                case "==":
+                default:
+                    return () => _data == d;
+                case "<":
+                    return () => _data < d;
+                case ">":
+                    return () => _data > d;
                 case "<=":
                 case "=<":
                     return () => _data <= d;     
                 case ">=":
                 case "=>":
                     return () => _data >= d;
-                case "=":
-                case "==":
-                default:
-                    return () => _data == d;
                 case "!=":
                     return () => _data != d;
             }
         }
 
-        public override void SetData(double value, string def = "") 
-        {
-            if (_data != _lastData)
-                _lastData = _data;
-        }
+        public override void SetData(double value, string def = "") => _data = value;
+
         public override bool CheckUpdate()
         {
-            var b = _data == _lastData;
+            Command.Invoke(this);
+            var b = _data != _lastData;
             if (b)
+            {
                 for (int i = 0; i < _conditions.Length; i++)
                     if (_conditions[i].Invoke())
                         break;
+            }
             return b;
         }
     }

@@ -181,23 +181,28 @@ namespace IngameScript
                                 if (cmd == "!screen")
                                     s.Data = ini.String(spr, Keys.Format) == "caps" ? Name.ToUpper() : Name;
                                 else
-                                {        
+                                {
                                     s.Format = ini.String(spr, Keys.Format);
                                     if (!cmds.ContainsKey(cmd))
                                         throw new Exception($"PARSE FAILURE: sprite {s.Name} on screen {Name} ({d.Name}) has invalid command {cmd}");
-                                  
+                                    if (ini.HasKey(spr, Keys.Conditions)) // is it conditional
+                                    {
+                                        var sc = new SpriteConditional(s);
+                                        sc.CreateMappings(ini.String(spr, Keys.Conditions));
+                                        s = sc;
+                                    }
                                     CommandUsers.Add(s.Name);
                                     s.Command = cmds[cmd];
                                     s.Command.Invoke(s);
 
-                                    if (d.noVCR)
+                                    if (d.noVCR) // switch to vanilla prepends
                                     {
                                         if (ini.HasKey(spr, Keys.Prepend + m_vn))
                                             s.Prepend = ini.String(spr, Keys.Prepend + m_vn) + " ";
                                         if (ini.HasKey(spr, Keys.Append + m_vn))
                                             s.Append = " " + ini.String(spr, Keys.Append + m_vn);
                                     }
-                                    else
+                                    else // normal case
                                     {
                                         if (ini.HasKey(spr, Keys.Prepend))
                                             s.Prepend = ini.String(spr, Keys.Prepend) + " ";
@@ -206,12 +211,7 @@ namespace IngameScript
                                     }
                                    
                                 }
-                                if (ini.HasKey(spr, Keys.Conditions))
-                                {
-                                    var sc = new SpriteConditional(s);
-                                    sc.CreateMappings(ini.String(spr, Keys.Conditions));
-                                    s = sc;
-                                }
+
                                 s.SetFlags(cmd);
                             }
                             Sprites[s.Name] = s;

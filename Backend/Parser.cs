@@ -133,7 +133,6 @@ namespace IngameScript
             }
             return true;
         }
-
         public bool Bool(string s, string k, bool def = false)
         {
             k = keymod(s, k);
@@ -149,12 +148,12 @@ namespace IngameScript
             k = keymod(s, k);
             byte r, g, b, a;
             def = myIni.Get(s, k).ToString(def).ToLower();
-            if (def.Length != 8)
+            if (def.Length != 6 && def.Length != 8)
                 return Lib.PINK; //safety
             r = Hex(def, 0, 2);
             g = Hex(def, 2, 2);
             b = Hex(def, 4, 2);
-            a = Hex(def, 6, 2);
+            a = def.Length == 8 ? Hex(def, 6, 2) : byte.MaxValue;
             return new Color(r, g, b, a);
         }
 
@@ -165,7 +164,7 @@ namespace IngameScript
             r = Hex(c, 0, 2);
             g = Hex(c, 2, 2);
             b = Hex(c, 4, 2);
-            a = Hex(c, 6, 2);
+            a = c.Length == 8 ? Hex(c, 6, 2) : byte.MaxValue;
             return new Color(r, g, b, a);
         }
         static byte Hex(string input, int start, int length) => Convert.ToByte(input.Substring(start, length), 16);
