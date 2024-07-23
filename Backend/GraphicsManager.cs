@@ -167,19 +167,20 @@ namespace IngameScript
                     {
                         int c = logos.Count;
                         CoyLogo l;
-                        if (ini.CustomData(b))
+                        if (ini.CustomData(b) && !ini.Bool(Keys.SurfaceSection, "IGNORE_L", false))
                         {
                             l = new CoyLogo(
                                 b as IMyTextPanel,
                                 ini.Bool(Keys.SurfaceSection, "FRAME_L", false),
                                 ini.Bool(Keys.SurfaceSection, "TEXT_L", false),
                                 ini.Bool(Keys.SurfaceSection, "VCR_L", false));
+                            l.SetAnimate();
+                            p = d.Setup(b, true);
+                            logos.Add(l);
+                            logos[c].color = d.logoColor;
                         }
-                        else l = new CoyLogo(b as IMyTextPanel);
-                        l.SetAnimate();
-                        logos.Add(l);
-                        p = d.Setup(b, true);
-                        logos[c].color = d.logoColor;
+                        else 
+                        p = d.Setup(b);
                     }
                 }
                 else p = d.Setup(b);
@@ -258,20 +259,20 @@ namespace IngameScript
                     {
                         for (; j < urg.Length; j++)
                             urg[j] = urg[j].Trim().Trim(c);
-                        if (_displaysMaster.ContainsKey(urg[0]) && int.TryParse(urg[1], out j))
+                        if (_displaysMaster.ContainsKey(urg[2]) && int.TryParse(urg[1], out j))
                         {
-                            k = _displaysMaster[urg[0]].Item2;
-                            switch (_displaysMaster[urg[0]].Item1)
+                            k = _displaysMaster[urg[2]].Item2;
+                            switch (_displaysMaster[urg[2]].Item1)
                             {
                                 case 0:
-                                   FastDisplays[k].MFDSwitch(j, urg[2]);
+                                   FastDisplays[k].MFDSwitch(j, urg[0]);
                                     break;
                                 case 1:
                                 default:
-                                   Displays[k].MFDSwitch(j, urg[2]);
+                                   Displays[k].MFDSwitch(j, urg[0]);
                                     break;
                                 case 2:
-                                    Static[k].MFDSwitch(j, urg[2]);
+                                    Static[k].MFDSwitch(j, urg[0]);
                                     break;
                             }
                         }

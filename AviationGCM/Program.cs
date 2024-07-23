@@ -13,12 +13,9 @@ namespace IngameScript
             CoyLogo.program = this;
             Manager = new GraphicsManager(this, tag);
 
-            Manager.AddUtil(new FlightUtilities(tag));
-            Manager.AddUtil(new GasUtilities());
             Manager.AddUtil(new PowerUtilities());
-            //Manager.AddUtil(new BlockUtilities(tag));
-            //Manager.AddUtil(new ThrustUtilities(tag));
-            //Manager.Utilities.Add(new CoreWeaponUtilities());
+            Manager.AddUtil(new EngineUtilities(tag));
+            Manager.AddUtil(new CoreWeaponUtilities());
             Manager.Init();
         }
 

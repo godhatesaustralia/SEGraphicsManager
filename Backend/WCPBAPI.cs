@@ -22,32 +22,31 @@ namespace IngameScript
 {
     public class WCPBAPI
     {
-        public bool isActive = false;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, IDictionary<string, int>, bool> _getBlockWeaponMap;
-        private Action<Sandbox.ModAPI.Ingame.IMyTerminalBlock, IDictionary<MyDetectedEntityInfo, float>> _getSortedThreats;
-        private Action<Sandbox.ModAPI.Ingame.IMyTerminalBlock, ICollection<Sandbox.ModAPI.Ingame.MyDetectedEntityInfo>> _getObstructions;
+        public static bool isActive = false;
+        private Func<IMyTerminalBlock, IDictionary<string, int>, bool> _getBlockWeaponMap;
+        private Action<IMyTerminalBlock, IDictionary<MyDetectedEntityInfo, float>> _getSortedThreats;
+        private Action<IMyTerminalBlock, ICollection<MyDetectedEntityInfo>> _getObstructions;
         private Func<long, int, MyDetectedEntityInfo> _getAiFocus;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, MyDetectedEntityInfo> _getWeaponTarget;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, bool, bool, bool> _isWeaponReadyToFire;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, float> _getMaxWeaponRange;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, long, int, bool> _canShootTarget;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, long, int, Vector3D?> _getPredictedTargetPos;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, float> _getHeatLevel;
-        private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, float> _currentPowerConsumption;
+        private Func<IMyTerminalBlock, int, MyDetectedEntityInfo> _getWeaponTarget;
+        private Func<IMyTerminalBlock, int, bool, bool, bool> _isWeaponReadyToFire;
+        private Func<IMyTerminalBlock, long, int, bool> _canShootTarget;
+        private Func<IMyTerminalBlock, long, int, Vector3D?> _getPredictedTargetPos;
+        private Func<IMyTerminalBlock, float> _getHeatLevel;
+        private Func<IMyTerminalBlock, float> _currentPowerConsumption;
         private Func<MyDefinitionId, float> _getMaxPower;
         //private Func<long, bool> _hasGridAi;
-        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, bool> _hasCoreWeapon;
+        //private Func<IMyTerminalBlock, bool> _hasCoreWeapon;
         //private Func<long, float> _getOptimalDps;
-        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, string> _getActiveAmmo;
-        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, long> _getPlayerController;
-        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, Matrix> _getWeaponAzimuthMatrix;
-        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, Matrix> _getWeaponElevationMatrix;
-        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, long, bool, bool, bool> _isTargetValid;
-        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, int, MyTuple<Vector3D, Vector3D>> _getWeaponScope;
-        //private Func<Sandbox.ModAPI.Ingame.IMyTerminalBlock, MyTuple<bool, bool>> _isInRange;
-        static public bool Activate(IMyTerminalBlock pbBlock, ref WCPBAPI api)
+        //private Func<IMyTerminalBlock, int, string> _getActiveAmmo;
+        //private Func<Ingame.IMyTerminalBlock, long> _getPlayerController;
+        //private Func<IMyTerminalBlock, int, Matrix> _getWeaponAzimuthMatrix;
+        //private Func<IMyTerminalBlock, int, Matrix> _getWeaponElevationMatrix;
+        //private Func<IMyTerminalBlock, long, bool, bool, bool> _isTargetValid;
+        //private Func<IMyTerminalBlock, int, MyTuple<Vector3D, Vector3D>> _getWeaponScope;
+        //private Func<IMyTerminalBlock, MyTuple<bool, bool>> _isInRange;
+        public static bool Activate(IMyTerminalBlock pbBlock, ref WCPBAPI api)
         {
-            if (api.isActive) 
+            if (isActive) 
                 return true;
             if (api != null)
                 return false;
@@ -58,7 +57,7 @@ namespace IngameScript
 
             api = new WCPBAPI();
             api.ApiAssign(dict);
-            api.isActive = true;
+            isActive = true;
             return true;
         }
 
@@ -73,7 +72,6 @@ namespace IngameScript
             AssignMethod(delegates, "GetAiFocus", ref _getAiFocus);
             AssignMethod(delegates, "GetWeaponTarget", ref _getWeaponTarget);
             AssignMethod(delegates, "IsWeaponReadyToFire", ref _isWeaponReadyToFire);
-            AssignMethod(delegates, "GetMaxWeaponRange", ref _getMaxWeaponRange);
             AssignMethod(delegates, "CanShootTarget", ref _canShootTarget);
             AssignMethod(delegates, "GetPredictedTargetPosition", ref _getPredictedTargetPos);
             AssignMethod(delegates, "GetHeatLevel", ref _getHeatLevel);
@@ -114,7 +112,7 @@ namespace IngameScript
 
         public void GetSortedThreats(IMyTerminalBlock pBlock, IDictionary<MyDetectedEntityInfo, float> collection) =>
             _getSortedThreats?.Invoke(pBlock, collection);
-        public void GetObstructions(IMyTerminalBlock pBlock, ICollection<Sandbox.ModAPI.Ingame.MyDetectedEntityInfo> collection) =>
+        public void GetObstructions(IMyTerminalBlock pBlock, ICollection<MyDetectedEntityInfo> collection) =>
             _getObstructions?.Invoke(pBlock, collection);
         public MyDetectedEntityInfo? GetAiFocus(long shooter, int priority = 0) => _getAiFocus?.Invoke(shooter, priority);
 
@@ -124,9 +122,6 @@ namespace IngameScript
         public bool IsWeaponReadyToFire(IMyTerminalBlock weapon, int weaponId = 0, bool anyWeaponReady = true,
             bool shootReady = false) =>
             _isWeaponReadyToFire?.Invoke(weapon, weaponId, anyWeaponReady, shootReady) ?? false;
-
-        public float GetMaxWeaponRange(IMyTerminalBlock weapon, int weaponId) =>
-            _getMaxWeaponRange?.Invoke(weapon, weaponId) ?? 0f;
 
         public bool CanShootTarget(IMyTerminalBlock weapon, long targetEnt, int weaponId) =>
             _canShootTarget?.Invoke(weapon, targetEnt, weaponId) ?? false;
