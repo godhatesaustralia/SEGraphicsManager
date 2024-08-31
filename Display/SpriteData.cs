@@ -1,13 +1,6 @@
-﻿using Sandbox.ModAPI.Ingame;
-using System;
-using System.Collections.Generic;
-using System.Runtime.CompilerServices;
-using System.Runtime.Remoting.Messaging;
-using System.Security.Policy;
+﻿using System;
 using System.Text;
 using VRage.Game.GUI.TextPanel;
-using VRage.Game.ModAPI.Ingame.Utilities;
-using VRage.Library.Utils;
 using VRageMath;
 
 namespace IngameScript
@@ -15,19 +8,16 @@ namespace IngameScript
     public class SpriteData
     {
         #region fields
-        const string l = "list";
+        const string L = "list";
         static int idBase = 3;
         bool isList, noFormat;
         public MySprite Sprite;
         public Action<SpriteData> Command = null;
         public Priority Priority;
         public int uID = -1; // this field is only set if sprite is using a cmd.
-        public string Name;
-        public string
-            LastData,
-            Format,
-            Prepend,
-            Append;
+        public string Name, LastData, Format, Prepend, Append;
+
+        #endregion
 
         public virtual string Data
         {
@@ -36,8 +26,6 @@ namespace IngameScript
         }
 
         public bool Builder { get; private set; }
-
-        #endregion
 
         public SpriteData()
         {
@@ -108,7 +96,7 @@ namespace IngameScript
         public void SetFlags(string c)
         {
             Builder = Prepend != "" || Append != "";
-            isList = c.Contains(l);
+            isList = c.Contains(L);
             noFormat = Format == "";
             if (!Builder) return;
             if (Prepend != null && Prepend.Contains("\n"))
@@ -158,7 +146,7 @@ namespace IngameScript
                 var b = Condition(ln[1], d);
                 if (ln[2] != "hide")
                 {
-                    var c = iniWrap.Color(ln[2]); // parse color
+                    var c = IniWrap.Color(ln[2]); // parse color
                     _conditions[i] = () =>
                     {
                         var r = b.Invoke();

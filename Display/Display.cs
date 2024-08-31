@@ -9,7 +9,7 @@ namespace IngameScript
 {
     public static class Keys
     {
-        public static readonly string
+        public const string
              SurfaceSection = "SURFACE",
              ScreenSection = "SCREEN_",
              SpriteSection = "SPRITE_", // always named, so just bake in the underscore 
@@ -28,6 +28,7 @@ namespace IngameScript
              Font = "FONT",
              Format = "FORMAT",
              Command = "CMD",
+             Key = "KEY",
              Update = "PRIORITY",
              Conditions = "CONDITIONS",
              Based = "BASED",
@@ -83,7 +84,7 @@ namespace IngameScript
             throw new Exception("\nNO KEY FOUND ON " + n + " ON SCREEN " + Name);
         }
 
-        public bool AddSprites(bool mfd, Display d, ref iniWrap ini, Dictionary<string, Action<SpriteData>> cmds, ref byte index, out Priority p)
+        public bool AddSprites(bool mfd, Display d, ref IniWrap ini, Dictionary<string, Action<SpriteData>> cmds, ref byte index, out Priority p)
         {
             var sect = mfd ? Keys.ScreenSection + Name : (d.isSingleScreen ? Keys.SurfaceSection : Keys.SurfaceSection + $"_{index}");
             int i = 0;
@@ -99,16 +100,17 @@ namespace IngameScript
                 {
                     for (; i < ct; i++)
                     {
-                    l[i] = l[i].Trim('>');
-                    l[i] = l[i].Trim();
-                    //Program.Echo(ns[i]); 
+                        l[i] = l[i].Trim('>');
+                        l[i] = l[i].Trim();
                     }
+
                     SpriteType type;
                     TextAlignment align;
                     float x, y, sx, sy, ros;
                     string dat, font = null;
-                    var c = Lib.PINK;
+                    var c = Color.HotPink;
                     dsp.ContentType = ContentType.SCRIPT;
+                    
                     for (i = 0; i < ct; i++)
                     {
                         sx = sy = 0;
@@ -154,10 +156,11 @@ namespace IngameScript
                                     if (ini.HasKey(spr, vpos) && !ini.TryReadVector2(spr, vpos, out x, out y, Name))
                                         Die(l[i]);
                                     font = def;
+
                                     if (ini.HasKey(spr, vscl))
                                         ros = ini.Float(spr, vscl, 1);
-                                    else
-                                        ros = ini.Float(spr, Keys.Scale, 1);
+                                    else ros = ini.Float(spr, Keys.Scale, 1);
+
                                     if (ini.HasKey(spr, Keys.Align + m_vn))
                                         align = ini.Alignment(spr, Keys.Align + m_vn);
                                     dat = ini.String(spr, Keys.Data + m_vn, dat);
@@ -183,14 +186,17 @@ namespace IngameScript
                                 else
                                 {
                                     s.Format = ini.String(spr, Keys.Format);
+
                                     if (!cmds.ContainsKey(cmd))
                                         throw new Exception($"PARSE FAILURE: sprite {s.Name} on screen {Name} ({d.Name}) has invalid command {cmd}");
+
                                     if (ini.HasKey(spr, Keys.Conditions)) // is it conditional
                                     {
                                         var sc = new SpriteConditional(s);
                                         sc.CreateMappings(ini.String(spr, Keys.Conditions));
                                         s = sc;
                                     }
+
                                     CommandUsers.Add(s.Name);
                                     s.Command = cmds[cmd];
                                     s.Command.Invoke(s);
@@ -199,6 +205,7 @@ namespace IngameScript
                                     {
                                         if (ini.HasKey(spr, Keys.Prepend + m_vn))
                                             s.Prepend = ini.String(spr, Keys.Prepend + m_vn) + " ";
+
                                         if (ini.HasKey(spr, Keys.Append + m_vn))
                                             s.Append = " " + ini.String(spr, Keys.Append + m_vn);
                                     }
@@ -206,6 +213,7 @@ namespace IngameScript
                                     {
                                         if (ini.HasKey(spr, Keys.Prepend))
                                             s.Prepend = ini.String(spr, Keys.Prepend) + " ";
+
                                         if (ini.HasKey(spr, Keys.Append))
                                             s.Append = " " + ini.String(spr, Keys.Append);
                                     }
@@ -216,8 +224,7 @@ namespace IngameScript
                             }
                             Sprites[s.Name] = s;
                         }
-                        else
-                            good = Default(this);
+                        else good = Default(this);
                     }
                 }
                 else return Default(this);
@@ -231,27 +238,24 @@ namespace IngameScript
     public class Display
     {
         #region fields
-
         public Priority BlockRefresh = 0;
         public Dictionary<string, Screen> Outputs = new Dictionary<string, Screen>();
         public Dictionary<int, string> ActiveScreens = new Dictionary<int, string>(); // active n of screens by surface index
         public Dictionary<int, HashSet<string>> ScreenNames = new Dictionary<int, HashSet<string>>();
+        Program _p;
         public readonly string Name;
         public readonly long dEID;
         public bool isEnabled => Host?.Enabled ?? true;
         public readonly bool isSingleScreen, noVCR;
         public Color logoColor = Color.White;
         readonly IMyFunctionalBlock Host;
-        GraphicsManager _m;
-       
         const string m_lg = "_L";  // suffix for logo keys
-
         #endregion
 
 
-        public Display(IMyTerminalBlock b, GraphicsManager m, bool c)
+        public Display(IMyTerminalBlock b, Program p, bool c)
         {
-            _m = m;
+            _p = p;
             Name = b.CustomName;
             dEID = b.EntityId;
             noVCR = c;
@@ -276,7 +280,7 @@ namespace IngameScript
         // the bedrock of this whole thing and it at least tries to be reasonable. this would probably
         // get obliterated on a server but i really still don't know what im doing
 
-        bool TryParse(ref IMyTextSurface surf, ref iniWrap ini, ref byte index, out Priority p)
+        bool TryParse(ref IMyTextSurface surf, ref IniWrap ini, ref byte index, out Priority p)
         {
             string sect;
             var l = new List<string>();
@@ -293,17 +297,19 @@ namespace IngameScript
                 var f = "~";
                 if (ini.HasKey(sect, Keys.Color + m_lg))
                     logoColor = ini.Color(sect, Keys.Color + m_lg);
+
                 if (isSingleScreen && ini.Bool(sect, Keys.Logo))
                 {
                     BlockRefresh = Priority.None;
                     Outputs.Clear();
                     return true;
                 }
+
                 var mfd = ini.HasKey(sect, Keys.ScreenList);
                 if (!mfd) // for non-MFDs
                 {
                     var sc = new Screen($"def{index}", surf);
-                    sc.AddSprites(mfd, this, ref ini, _m.Commands, ref index, out p);
+                    sc.AddSprites(mfd, this, ref ini, _p.Commands, ref index, out p);
                     Outputs.Add(sc.Name, sc);
                     ActiveScreens.Add(index, sc.Name);
                     if (ScreenNames.ContainsKey(index))
@@ -311,6 +317,7 @@ namespace IngameScript
                     else ScreenNames[index] = new HashSet<string> { sc.Name };
                     return true;
                 }
+
                 var n = ini.String(sect, Keys.ScreenList, f);
                 if (n == f)
                 {
@@ -319,19 +326,23 @@ namespace IngameScript
                     Outputs.Add(sc.Name, sc);              
                     return false;
                 }
+
                 var ns = n.Split('\n'); // getting names of different screens
                 for (; i < ns.Length; i++)
                 {
                     ns[i] = ns[i].Trim('>');
                     ns[i] = ns[i].Trim();
                     var sc = new Screen(ns[i], surf);
-                    var ok = sc.AddSprites(mfd, this, ref ini, _m.Commands, ref index, out p);
+                    var ok = sc.AddSprites(mfd, this, ref ini, _p.Commands, ref index, out p);
                     if (!ok)
                         Default(ref sc);
+
                     good &= ok;
                     Outputs.Add(sc.Name, sc);
+
                     if (i == 0)
                         ActiveScreens.Add(index, sc.Name);
+
                     if (ScreenNames.ContainsKey(index))
                         ScreenNames[index].Add(sc.Name);
                     else ScreenNames[index] = new HashSet<string> { sc.Name };
@@ -357,7 +368,7 @@ namespace IngameScript
         public Priority Setup(IMyTerminalBlock block, bool w = false)
         {
             bool ok = true;
-            var p = new iniWrap();
+            var p = new IniWrap();
             byte index = 0;
             MyIniParseResult Result;
             Priority ret, pri = ret = Priority.None;
@@ -378,6 +389,7 @@ namespace IngameScript
                     {
                         if (!p.HasSection($"{Keys.SurfaceSection}_{index}"))
                             continue;
+
                         var surface = DisplayBlock.GetSurface(index);
                         //if (!Outputs.ContainsKey(surface))
                         //    Outputs.Add(surface, new Dictionary<string, SpriteData>());
@@ -390,16 +402,21 @@ namespace IngameScript
             else throw new Exception($" PARSE FAILURE: {Name} cd error {Result.Error} at {Result.LineNo}");
             //p.Dispose();
             if (Outputs.Count == 0) return Priority.None;
+
             if (!w) SetPriority();
+
             foreach (var scr in ActiveScreens.Values)
             {
                 var s = Outputs[scr];
                 s.dsp.ScriptBackgroundColor = s.BG;
                 var f = s.dsp.DrawFrame();
+
                 foreach (var n in s.CommandUsers)
                     s.Sprites[n].CheckUpdate();
+
                 foreach (var spr in s.Sprites.Values)
                     f.Add(spr.Sprite);
+
                 f.Dispose();
             }
             return ret;
@@ -417,10 +434,12 @@ namespace IngameScript
         {
             if (!(ScreenNames.ContainsKey(i) && ScreenNames[i].Contains(n)))
                 return;
+
             ActiveScreens[i] = n;
             var f = Outputs[n].dsp.DrawFrame();
             foreach (var s in Outputs[n].Sprites.Values)
                 f.Add(s.Sprite);
+
             f.Dispose();
         }
 

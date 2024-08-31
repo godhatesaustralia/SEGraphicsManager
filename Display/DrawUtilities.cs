@@ -1,32 +1,10 @@
-﻿using Sandbox.Engine.Platform.VideoMode;
-using Sandbox.Game.AI.Logic;
-using Sandbox.Game.Entities;
-using Sandbox.Game.EntityComponents;
-using Sandbox.ModAPI.Ingame;
+﻿using Sandbox.ModAPI.Ingame;
 using Sandbox.ModAPI.Interfaces;
-using SpaceEngineers.Game.Entities.Blocks;
-using SpaceEngineers.Game.ModAPI.Ingame;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Linq;
-using System.Net.Sockets;
-using System.Reflection;
-using System.Security.Claims;
-using System.Text;
-using System.Threading;
 using VRage;
-using VRage.Collections;
-using VRage.Game;
-using VRage.Game.Components;
 using VRage.Game.GUI.TextPanel;
-using VRage.Game.ModAPI.Ingame;
-using VRage.Game.ModAPI.Ingame.Utilities;
-using VRage.Game.ObjectBuilders.Definitions;
-using VRage.Scripting;
 using VRageMath;
-using VRageRender;
 
 namespace IngameScript
 {
@@ -34,12 +12,19 @@ namespace IngameScript
     {
         static public Dictionary<long, MyTuple<bool, float?>> GraphStorage = new Dictionary<long, MyTuple<bool, float?>>();
         static public int bsodsTotal = 0;
-        static public SpriteType TXT = SpriteType.TEXT;
-        static public TextAlignment CNR = TextAlignment.CENTER;
-        static public UpdateFrequency NONE = UpdateFrequency.None;
-        static public Color PINK = Color.HotPink;
-        static public string bsod = "A problem has been detected and Windows has been shut down to prevent damage \r\nto your computer. \r\nUNMOUNTABLE_BOOT_VOLUME \r\nIf this is the first time you've seen this error screen, \r\nrestart your computer. If this screen appears again, follow \r\nthese steps: \r\nCheck to be sure you have adequate disk space. If a driver is \r\nidentified in the Stop message, disable the driver or check \r\nwith the manufacturer for driver updates. Try changing video \r\nadapters. \r\nCheck with your hardware vendor for any BIOS updates. Disable \r\nBIOS memory options such as caching or shadowing. \r\nIf you need to use Safe Mode to remove or disable components, restart \r\nyour computer, press F8 to select Advanced Startup Options, and then \r\nselect Safe Mode. \r\n \r\nTechnical Information: \r\n*** STOP: 0x000000ED(0x80F128D0, 0xC000009C, 0x00000000, 0x00000000) \r\n \r\n";
+        public const SpriteType TXT = SpriteType.TEXT;
+        public const TextAlignment CNR = TextAlignment.CENTER;
+        public const UpdateFrequency NONE = UpdateFrequency.None;
+        
+        public const string 
+            bsod = "A problem has been detected and Windows has been shut down to prevent damage \r\nto your computer. \r\nUNMOUNTABLE_BOOT_VOLUME \r\nIf this is the first time you've seen this error screen, \r\nrestart your computer. If this screen appears again, follow \r\nthese steps: \r\nCheck to be sure you have adequate disk space. If a driver is \r\nidentified in the Stop message, disable the driver or check \r\nwith the manufacturer for driver updates. Try changing video \r\nadapters. \r\nCheck with your hardware vendor for any BIOS updates. Disable \r\nBIOS memory options such as caching or shadowing. \r\nIf you need to use Safe Mode to remove or disable components, restart \r\nyour computer, press F8 to select Advanced Startup Options, and then \r\nselect Safe Mode. \r\n \r\nTechnical Information: \r\n*** STOP: 0x000000ED(0x80F128D0, 0xC000009C, 0x00000000, 0x00000000) \r\n \r\n",
+            IVD = "••",
+            HDR = "GCM";
+        public static SpriteData SJIT = new SpriteData{uID = int.MinValue};
         static Vector2 _size = new Vector2();
+
+        public const char CMD = '!', NLN = '\n';
+
         static public int Next(ref int p, int max)
         {
             if (p < max)
@@ -72,27 +57,6 @@ namespace IngameScript
             }
             d.Sprite.Size = _size;
         }
-
-        //static public string EncodeSprites(ref Display display)
-        // the idea: have this make the requisite SpriteData constructors here bc im too lazy
-        // the constructor in question:
-        //   public SpriteData(Color color, string name = "", string value = "", float posX = 0, float posY = 0, float ros = float.MinValue,
-        //   float szX = 0, float szY = 0, string font = "White", BlockRefresh p = BlockRefresh.None, SpriteType type = SpriteType.TEXT,
-        //   TextAlignment align = TextAlignment.CENTER, string command = "", string prepend = "", string append = "")
-        //{
-        //    var eOut = "";
-        //    foreach (var surface in display.Outputs)
-        //    {
-        //        eOut += $"//\nscreen {surface.Key.Name} background color {surface.Key.BackgroundColor}\n";
-        //        foreach (var s in surface.Value.Values)
-        //        {
-        //            eOut += $"new SpriteData(new Color({s.Color.R}, {s.Color.G}, {s.Color.B}, {s.Color.A}), {s.Name}, {s.Data}, ";
-        //            eOut += $"{s.X}, {s.Y}, {s.RorS}, {s.sX}, {s.sY}, {s.FontID}, {s.BlockRefresh}, {s.Type}, {s.Alignment}, {s.Command}, {s.Prepend}, {s.Append});\n";
-        //        }
-        //    }
-        //    return eOut;
-        //}
-
     }
 
     public class DebugAPI

@@ -7,71 +7,54 @@ using VRage.Game.GUI.TextPanel;
 
 namespace IngameScript
 {
-    public class iniWrap : IDisposable
+    public class IniWrap : IDisposable
     {
         static List<MyIni> IniParsers = new List<MyIni>();
         static int IniCount = 0;
         public static int total = 0;
         public static int Count => IniParsers.Count;
-        MyIni myIni;
+        MyIni _ini;
         static MyIniParseResult result;
 
-        public iniWrap()
+        public IniWrap()
         {
             ++IniCount;
             ++total;
             if (IniParsers.Count < IniCount)
                 IniParsers.Add(new MyIni());
-            myIni = IniParsers[IniCount - 1];
+            _ini = IniParsers[IniCount - 1];
 
-            myIni.Clear();
+            _ini.Clear();
         }
 
         public bool CustomData(IMyTerminalBlock b, out MyIniParseResult r)
         {
-            var output = myIni.TryParse(b.CustomData, out result);
+            var output = _ini.TryParse(b.CustomData, out result);
             r = result;
             return output;
         }
 
         public bool CustomData(IMyTerminalBlock b)
         {
-            var output = myIni.TryParse(b.CustomData, out result);
+            var output = _ini.TryParse(b.CustomData, out result);
             return output;
         }
 
-        public bool HasSection(string s)
-        {
-            return myIni.ContainsSection(s);
-        }
+        public bool HasSection(string s) => _ini.ContainsSection(s);
 
-        public bool HasKey(string s, string k)
-        {
-            k = keymod(s, k);
-            return myIni.ContainsKey(s, k);
-        }
+        public bool HasKey(string s, string k) => _ini.ContainsKey(s, k);
 
-        public float Float(string s, string k, float def = 1)
-        {
-            k = keymod(s, k);
-            return myIni.Get(s, k).ToSingle(def);
-        }
-        //public double Double(string s, string k, double def = 0)
-        //{
-        //    k = keymod(s, k);
-        //    return myIni.Get(s, k).ToDouble(def);
-        //}
+        public float Float(string s, string k, float def = 1) => _ini.Get(s, k).ToSingle(def);
 
-        public int Int(string s, string k, int def = 0)
-        {
-            k = keymod(s, k);
-            return myIni.Get(s, k).ToInt32(def);
-        }
+        public int Int(string s, string k, int def = 0) => _ini.Get(s, k).ToInt32(def);
+
+        public bool Bool(string s, string k, bool def = false) => _ini.Get(s, k).ToBoolean(def);
+
+        public string String(string s, string k, string def = "") => _ini.Get(s, k).ToString(def);
 
         public SpriteType Type(string s, string k)
         {
-            k = keymod(s, k);
-            var t = myIni.Get(s, k);
+            var t = _ini.Get(s, k);
             string c = "";
             if (t.ToByte(3) != 3)
                 return (SpriteType)t.ToByte(2);
@@ -92,8 +75,7 @@ namespace IngameScript
         }
         public TextAlignment Alignment(string s, string k)
         {
-            k = keymod(s, k);
-            var a = myIni.Get(s, k);
+            var a = _ini.Get(s, k);
             string c = "";
             if (a.ToByte(3) != 3)
                 return (TextAlignment)a.ToByte(2);
@@ -117,7 +99,7 @@ namespace IngameScript
         public bool TryReadVector2(string s, string k, out float x, out float y, string n = "")
         {
             x = y = 0;
-            string ln = myIni.Get(s, k).ToString();
+            string ln = _ini.Get(s, k).ToString();
             if (ln == "")
                 return false;
             var v = ln.Split(',');
@@ -133,23 +115,13 @@ namespace IngameScript
             }
             return true;
         }
-        public bool Bool(string s, string k, bool def = false)
-        {
-            k = keymod(s, k);
-            return myIni.Get(s, k).ToBoolean(def);
-        }
-        public string String(string s, string k, string def = "")
-        {
-            k = keymod(s, k);
-            return myIni.Get(s, k).ToString(def);
-        }
+
         public Color Color(string s, string k, string def = "")
         {
-            k = keymod(s, k);
             byte r, g, b, a;
-            def = myIni.Get(s, k).ToString(def).ToLower();
+            def = _ini.Get(s, k).ToString(def).ToLower();
             if (def.Length != 6 && def.Length != 8)
-                return Lib.PINK; //safety
+                return VRageMath.Color.HotPink; //safety
             r = Hex(def, 0, 2);
             g = Hex(def, 2, 2);
             b = Hex(def, 4, 2);
@@ -169,17 +141,11 @@ namespace IngameScript
         }
         static byte Hex(string input, int start, int length) => Convert.ToByte(input.Substring(start, length), 16);
 
-        string keymod(string s, string k)
-        {
-            k = !myIni.ContainsKey(s, k.ToLower()) ? k : k.ToLower();
-            return k;
-        }
-
-        public override string ToString() => myIni.ToString();
+        public override string ToString() => _ini.ToString();
 
         public void Dispose()
         {
-            myIni.Clear();
+            _ini.Clear();
             IniCount--;
         }
     }
