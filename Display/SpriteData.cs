@@ -15,7 +15,7 @@ namespace IngameScript
         public Action<SpriteData> Command = null;
         public Priority Priority;
         public int uID = -1; // this field is only set if sprite is using a cmd.
-        public string Name, LastData, Format, Prepend, Append;
+        public string Name, LastData, Format, Prepend, Append, Key;
 
         #endregion
 

@@ -186,6 +186,7 @@ namespace IngameScript
                                 else
                                 {
                                     s.Format = ini.String(spr, Keys.Format);
+                                    s.Key = ini.String(spr, Keys.Key);
 
                                     if (!cmds.ContainsKey(cmd))
                                         throw new Exception($"PARSE FAILURE: sprite {s.Name} on screen {Name} ({d.Name}) has invalid command {cmd}");

@@ -43,17 +43,19 @@ namespace IngameScript
         }
         static public void UpdateBarGraph(ref SpriteData d, double pctData)
         {
+            MyTuple<bool, float?> g;
+            if (!GraphStorage.TryGetValue(d.uID, out g)) return;
             // very dumb       
-            var graph = GraphStorage[d.uID];
-            if (graph.Item1)
+
+            if (g.Item1)
             {
-                _size.X = Convert.ToSingle(pctData) * graph.Item2.Value;
+                _size.X = Convert.ToSingle(pctData) * g.Item2.Value;
                 _size.Y = d.Sprite.Size.Value.Y;
             }
             else 
             {
                _size.X = d.Sprite.Size.Value.X;
-               _size.Y = Convert.ToSingle(pctData) * graph.Item2.Value; 
+               _size.Y = Convert.ToSingle(pctData) * g.Item2.Value; 
             }
             d.Sprite.Size = _size;
         }

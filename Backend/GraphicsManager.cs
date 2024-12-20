@@ -25,15 +25,13 @@ namespace IngameScript
 
         HashSet<IMyTerminalBlock> DisplayBlocks = new HashSet<IMyTerminalBlock>();
 
-        public bool Startup => !setupComplete;
-
         int dPtr, iPtr, // display pointers
             min, fast; // min - frames to wait for echo, fast - determines BlockRefresh.Fast
         const int rtMax = 10; // theoretically accurate for update10
         double totalRt, RuntimeMS, WorstRun, AverageRun;
         Queue<double> runtimes = new Queue<double>(rtMax);
-        bool frozen = false, setupComplete, draw, useLogo, larp;
-        public bool isCringe;
+        bool frozen = false, draw, useLogo, larp;
+        public bool SetupComplete, isCringe;
         TimeSpan addLarp;
         long Frame, WorstFrame;
         public long F => Frame;
@@ -55,7 +53,7 @@ namespace IngameScript
         public void Init(bool full = true)
         {
             Runtime.UpdateFrequency |= UpdateFrequency.Update1 | UpdateFrequency.Update10 | UpdateFrequency.Update100;
-            setupComplete = false;
+            SetupComplete = false;
             Clear(full);
             if (full)
             {
@@ -93,7 +91,7 @@ namespace IngameScript
         {
             if (DisplayBlocks.Count == 0)
             {
-                setupComplete = true;
+                SetupComplete = true;
                 if (Displays.Count == 0)
                 {
                     Runtime.UpdateFrequency = UpdateFrequency.None;

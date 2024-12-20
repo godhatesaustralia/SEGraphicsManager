@@ -1,378 +1,68 @@
-﻿using Sandbox.Game.EntityComponents;
-using Sandbox.ModAPI.Ingame;
+﻿using Sandbox.ModAPI.Ingame;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
-using VRage.Game;
 using VRage.Game.ModAPI.Ingame;
+using VRage.Game.ModAPI.Ingame.Utilities;
 using VRageMath;
 
 namespace IngameScript
 {
-    public class DataGroup : IEquatable<DataGroup>
+    public class Info
     {
-        public string Name;
-        public string[] Tags, Formats;
-        public long[] Keys;
-        public bool Equals(DataGroup g) => Name == g.Name;
-    }
+        public readonly string Name;
+        public double Data => value;
+        protected double value, lastValue;
+        protected bool dataChanged => value != lastValue;
 
-    public interface IInfo
-    {
-        double Data {get;}
-        bool Changed {get;}
-        void Update();
-    }
-
-    public class Info : IInfo
-    {
-        public double Data {get; protected set;}
-        public readonly long EID;
-        public readonly double Capacity;
-        public bool Changed => Data != _lastData;
-        protected double _lastData;
-        Func<double> update;
-        public Info(Func<double> u = null, double c = -1)
+        public Func<bool> IsValid = () => true;
+        protected Func<double> update;
+        public Info(string n = "", Func<double> u = null, Func<bool> v = null)
         {
+            Name = n;
             update = u;
-            Capacity = c;
+            IsValid = v ?? IsValid;
         }
-        public void Update()
-        {
-            _lastData = Data;
-            Data = update();
-        }
+        public virtual void Update() => value = update.Invoke();
     }
 
-    public partial class Program : MyGridProgram
+    public abstract class UtilityBase
     {
-        string[] _dataKeys;
-        Dictionary<long, IInfo> _data = new Dictionary<long, IInfo>();
-        Dictionary<int, DataGroup> _mappedGroups = new Dictionary<int, DataGroup>();
-        Dictionary<string, DataGroup> _groups = new Dictionary<string, DataGroup>();
-        Dictionary<string, IMyTerminalBlock> _nameToBlock = new Dictionary<string, IMyTerminalBlock>();
-        DataGroup _tmp = new DataGroup();
+        #region fields
+        protected Program _p;
+        protected const char
+            cmd = '!',
+            bar = 'b',
+            pct = '%';
+        protected string invalid = "••", name;
 
-        List<IMyGasGenerator> _o2h2 = new List<IMyGasGenerator>();
-        ItemInfo IceOre, Fuel;
-        const int KEEN = 5;
-        const double TOL = 0.01, MAX_JD_PWR = 1 / 3E6, BAD = double.NaN;
-        DateTime _h2TS, _stopTS, _accelTS; // fuck you
-        double
-            _lastDist, _maxDist, _lastAccel, _maxAccel, _totalCharge,
-            _lastH2, // sigh
-            _pmax;
-        Vector3D VZed = Vector3D.Zero, lastVel, grav;
-        UseRate U, Ice = new UseRate("Ore!Ice");
+        public string Name => name.ToUpper();
+        protected List<string> _closed = new List<string>();
+        protected SpriteData jitSprite = new SpriteData();
+        protected const double bad = double.NaN;
+        #endregion
 
-        const string
-            _B = "_bar", _P = "_pct", _T = "_time",
-            H2 = "h2", O2 = "o2",
-            HZ = "horiz", A = "accel",  AF = "alt_surf", AC = "alt_sea", ST = "stop",
-            J = "jdc";
-
-        void UpdateData(SpriteData d)
+        public virtual void Reset(Program p)
         {
-            DataGroup g;
-            if (!_mappedGroups.TryGetValue(d.uID, out g))
-            {
-                d.Data = Lib.IVD;
-                return;
-            }
-
-            for (int i = g.Keys.Length - 1; i >= 0; i--)
-            {
-
-            }
-
+            _p = p;
+            jitSprite.uID = int.MinValue;
+            GetBlocks();
         }
 
-        DataGroup CreateGroup<T>(string n, string d, ref Dictionary<string, T> blocks)
-        where T : IMyTerminalBlock
+        protected void Validate(double v, ref SpriteData d, string def = "")
         {
-            if (string.IsNullOrEmpty(n) || string.IsNullOrEmpty(d))
-                return null;
-            var a = d.Split('\n');
-            int i = 0, c = a.Length;
-
-            if (a == null || c == 0)
-                return null;
-            string[][] a2 = new string[c][];
-
-            var g = new DataGroup { Name = n, Keys = new long[c], Tags = new string[c] };
-            for (; i < c; i++)
-            {
-                a2[i] = a[i].Split('\n');
-                g.Tags[i] = a2[i][0];
-                g.Keys[i] = blocks[a2[i][1]].EntityId;
-                g.Formats[i] = a2[i][2];
-            }
-            return g;
-        }
-
-        bool Collect<T>(T b, Func<double> d)
-        where T : IMyTerminalBlock
-        {
-            if (b.IsSameConstructAs(Me))
-            {
-                _nameToBlock[b.CustomName] = b;
-                _data[b.EntityId] = new Info(d);
-            }
-            return false;
-        }
-
-        void GetList<T>(ref List<IMyTerminalBlock> l)
-        where T : class // this is retardedv thnkas keen
-        {
-            l.Clear();
-            GTS.GetBlocksOfType<T>(l, b => b.IsSameConstructAs(_g.Me));
-        }
-
-        public void GetBlocks()
-        {
-            var tempBlocks = new List<IMyTerminalBlock>();
-            GTS.GetBlocksOfType<IMyGasGenerator>(tempBlocks, b => b.IsSameConstructAs(_g.Me));
-            GTS.GetBlocksOfType<IMyGasTank>(null, b => Collect(b, () => b.FilledRatio));
-
-
-            
-            IceOre = new ItemInfo("Ore", "Ice", _o2h2.ToList<IMyTerminalBlock>());
-
-            GTS.GetBlocksOfType<IMyJumpDrive>(null, b => Collect(b, () => b.CurrentStoredPower));
-
-
-
-        }
-
-        public void Setup(ref Dictionary<string, Action<SpriteData>> cmd)
-        {
-            cmd[H2] = b =>
-                b.SetData(_data[H2].Data);
-            cmd[H2 + _P] = b =>
-                b.SetData(_data[H2].Data, "#0.#%");
-            cmd[H2 + _B] = b =>
-            {
-                if (_g.justStarted)
-                    Lib.CreateBarGraph(ref b);
-                Lib.UpdateBarGraph(ref b, _data[H2].Data);
-            };
-
-            cmd[O2] = b =>
-                b.SetData(_data[O2].Data);
-            cmd[O2 + _P] = b =>
-                b.SetData(_data[O2].Data, "#0.#%");
-            cmd[O2 + _B] = b =>
-            {
-                if (_g.justStarted)
-                    Lib.CreateBarGraph(ref b);
-                Lib.UpdateBarGraph(ref b, _data[O2].Data);
-            };
-
-            cmd[H2 + _T] = b =>
-            {
-                var t = HydrogenTime();
-                if (t == TimeSpan.Zero)
-                    b.Data = Lib.IVD;
-                else if (t.TotalHours >= 1)
-                    b.Data = string.Format("{0,2}h {1,2}m", (long)t.TotalHours, (long)t.Minutes);
-                else
-                    b.Data = string.Format("{0,2}m {1,2}s", (long)t.TotalMinutes, (long)t.Seconds);
-            };
-
-            GetHorizonAngle();
-            Accel();
-            GetAlt(MyPlanetElevation.Sealevel);
-            StoppingDist();
-
-            cmd[HZ] = b =>
-                 Validate(GetHorizonAngle(), ref b, "-#0.##; +#0.##" + "°");
-
-            cmd[AC] = b =>
-                Validate(GetAlt(MyPlanetElevation.Sealevel), ref b, Lib.IVD);
-
-            cmd[AF] = b =>
-                Validate(GetAlt(MyPlanetElevation.Surface), ref b, Lib.IVD);
-
-            cmd[ST] = b =>
-                Validate(StoppingDist(), ref b, Lib.IVD);
-
-            cmd[A] = b => Validate(Accel(), ref b, Lib.IVD);
-
-            cmd[J] = b =>
-            {
-                if (Startup && !_mappedGroups.ContainsKey(b.uID))
-                {
-                    _tmp.Name = b.Data;
-                    if (b.Data.Contains(Lib.CMD))
-                    {
-                        var a = b.Data.Split(Lib.CMD);
-                        _mappedGroups.Add(b.uID, new DataGroup { Name = b.Name, Tags = new string[] { a[0] }, Keys = new int[] { a[1].GetHashCode() }, Formats = new string[] { b.Format } });
-                    }
-                    else if (_groups.Contains(_tmp))
-
-
-                }
-            };
-            cmd.Add("!jdc", b => { if (_jdDict.ContainsKey(b.Key)) b.SetData(_jdDict[b.Key].Data); });
-            cmd["!jdc%"] = b => { if (_jdDict.ContainsKey(b.Key)) b.SetData(_jdDict[b.Key].Data * MAX_JD_PWR); });
-            commands.Add("!jdcb", b =>
-            {
-                if (GCM.justStarted)
-                    Lib.CreateBarGraph(ref b);
-                Lib.UpdateBarGraph(ref b, _jdDict[b.Key].Data * MAX_JD_PWR);
-            });
-
-            commands.Add("!jcharge%", b => b.SetData(totalCharge * MAX_JD_PWR, "#0.#%"));
-            commands.Add("!jchargeb", b =>
-            {
-                if (GCM.justStarted)
-                    Lib.CreateBarGraph(ref b);
-                Lib.UpdateBarGraph(ref b, totalCharge * MAX_JD_PWR);
-            });
-        }
-
-        void Validate(double v, ref SpriteData d, string def = "")
-        {
-            if (double.IsNaN(v)) d.Data = Lib.IVD;
+            if (double.IsNaN(v)) d.Data = invalid;
             else d.SetData(v, def);
         }
+        public abstract void Update();
 
-        #region gas
+        public abstract void GetBlocks();
 
-        double TankStatus(ref List<IMyGasTank> tanks, bool pct)
-        {
-            var amt = 0d;
-            var total = amt;
-            for (int i = 0; i < tanks.Count; i++)
-            {
-                amt += tanks[i].FilledRatio * tanks[i].Capacity;
-                total += tanks[i].Capacity;
-            }
-            return pct ? amt / total : amt;
-        }
+        public abstract void Setup(ref Dictionary<string, Action<SpriteData>> commands);
 
-        TimeSpan HydrogenTime()
-        {
-            var ts = DateTime.Now;
-            double
-                d = _data[H2].Data,
-                r = MathHelperD.Clamp(_lastH2 - d, 1E-50, double.MaxValue) / (ts - _h2TS).TotalSeconds,
-                v = d / r;
-
-            _lastH2 = d;
-            _h2TS = ts;
-
-            if (r < 1E-15 || double.IsNaN(v) || v > 1E5)
-                return TimeSpan.Zero;
-            return TimeSpan.FromSeconds(v);
-        }
-        #endregion
-
-        #region power
-        double Output()
-        {
-            var sum = 0f;
-            _pmax = 0;
-            for (int i = 0; i < AllPower.Count; i++)
-            {
-                if (!AllPower[i].IsFunctional || !AllPower[i].Enabled)
-                    continue;
-
-                sum += AllPower[i].CurrentOutput;
-                _pmax += AllPower[i].MaxOutput;
-            }
-            return sum;
-
-        }
-        #endregion
-
-        #region flight
-        bool GravCheck(out Vector3D grav) //wanted something nice and neat
-        {
-            grav = Controller.GetNaturalGravity();
-            if (grav == VZed)
-                return false;
-            return true;
-        }
-
-        double GetHorizonAngle()
-        {
-            if (!GravCheck(out grav))
-                return BAD;
-            if (grav == VZed)
-                return BAD;
-            grav.Normalize();
-            return Math.Asin(MathHelper.Clamp(Controller.WorldMatrix.Forward.Dot(grav), -1, 1));
-        }
-
-        double GetAlt(MyPlanetElevation elevation)
-        {
-            if (!GravCheck(out grav))
-                return BAD;
-            var alt = 0d;
-            if (Controller.TryGetPlanetElevation(elevation, out alt))
-                return alt;
-            return BAD;
-        }
-
-        double Accel()
-        {
-            var ret = 0d;
-            var ts = DateTime.Now;
-            if (Startup)
-                return BAD;
-
-            var current = Controller.GetShipVelocities().LinearVelocity;
-            if (current.Length() < 0.037)
-            {
-                _lastAccel = 0;
-                return BAD;
-            }
-
-            var mag = (current - lastVel).Length();
-            if (mag > TOL)
-                ret += mag / (ts - _accelTS).TotalSeconds;
-
-            if (ret > _maxAccel) _maxAccel = ret;
-
-            _lastAccel = ret;
-            _accelTS = ts;
-
-            return ret <= TOL ? _maxAccel : ret;
-        }
-
-        double StoppingDist()
-        {
-            double
-                ret = _lastDist,
-                a = 0;
-            var ts = DateTime.Now;
-
-            var current = Controller.GetShipVelocities().LinearVelocity;
-            if (!Startup)
-            {
-                if (!Controller.DampenersOverride || current.Length() < 0.037) return BAD;
-                var mag = (lastVel - current).Length();
-                if (mag > TOL)
-                {
-                    a = mag / (ts - _stopTS).TotalSeconds;
-                    ret = current.Length() * current.Length() / (2 * a);
-                    _lastDist = ret;
-                }
-            }
-
-            if (ret > _maxDist) _maxDist = ret;
-
-            lastVel = current;
-            _stopTS = ts;
-
-            return a <= TOL ? _maxDist : ret;
-        }
-        #endregion
 
     }
-
 
     // SO...command formatting. Depends on the general command, but here's the idea
     // this is all for the DATA field of the sprite.
@@ -384,111 +74,165 @@ namespace IngameScript
 
     public class GasUtilities : UtilityBase
     {
-        List<IMyGasTank>
-            HydrogenTanks = new List<IMyGasTank>(),
-            OxygenTanks = new List<IMyGasTank>();
-        List<IMyGasGenerator> Gens = new List<IMyGasGenerator>();
-        UseRate Ice;
-        ItemInfo IceOre;
+        Dictionary<string, Info>
+            H2Tanks = new Dictionary<string, Info>(),
+            O2Tanks = new Dictionary<string, Info>();
+
+        //UseRate Ice;
+        //ItemInfo IceOre;
         const int keen = 5;
         DateTime tsH2;
-        double lastH2; // sigh
-        Info h2, o2;
+        double _h2, _o2, _lastH2; // sigh
 
         public GasUtilities()
         {
             name = "Gas";
-            Ice = new UseRate("Ore!Ice");
+            //Ice = new UseRate("Ore!Ice");
         }
 
         #region UtilityBase
 
         public override void GetBlocks()
         {
-            HydrogenTanks.Clear();
-            OxygenTanks.Clear();
-            Gens.Clear();
-            GCM.Terminal.GetBlocksOfType(HydrogenTanks, (b) => b.IsSameConstructAs(GCM.Me) && b.BlockDefinition.SubtypeId.Contains("Hyd"));
-            GCM.Terminal.GetBlocksOfType(OxygenTanks, (b) => !HydrogenTanks.Contains(b) && b.IsSameConstructAs(GCM.Me));
-            GCM.Terminal.GetBlocksOfType(Gens, (b) => b.IsSameConstructAs(GCM.Me));
-            IceOre = new ItemInfo("Ore", "Ice", Gens.ToList<IMyTerminalBlock>());
+
+            H2Tanks.Clear();
+            _p.GTS.GetBlocksOfType<IMyGasTank>(null, b =>
+            {
+                var n = b.CustomName;
+                if (b.IsSameConstructAs(_p.Me) && b.BlockDefinition.SubtypeId.Contains("Hyd") && !H2Tanks.ContainsKey(n))
+                    H2Tanks[n] = new Info(n, () => b.FilledRatio, () => !b.Closed && b.IsFunctional);
+
+                return false;
+            });
+
+            O2Tanks.Clear();
+            _p.GTS.GetBlocksOfType<IMyGasTank>(null, b =>
+            {
+                var n = b.CustomName;
+                if (b.IsSameConstructAs(_p.Me) && b.BlockDefinition.SubtypeId.Contains("Hyd") && !H2Tanks.ContainsKey(n) && !O2Tanks.ContainsKey(n))
+                    O2Tanks[n] = new Info(n, () => b.FilledRatio, () => !b.Closed && b.IsFunctional);
+
+                return false;
+            });
         }
 
-        public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
-        {           //s fucking hate this, this sucks ass
-            h2 = new Info("h2%", HydrogenStatus);
-            o2 = new Info("o2%", OxygenStatus);
+        public override void Setup(ref Dictionary<string, Action<SpriteData>> c)
+        {
             // JIT
             HydrogenTime();
-            HydrogenStatus();
-            OxygenStatus();
 
-            commands.Add("!h2%", b =>
-                b.SetData(h2.Data, "#0.#%"));
-
-            commands.Add("!o2%", b =>
-                b.SetData(o2.Data, "#0.#%"));
-
-            commands.Add("!h2b", b =>
+            c["!h2tank%"] = b =>
             {
-                if (GCM.justStarted)
-                    Lib.CreateBarGraph(ref b);
-                Lib.UpdateBarGraph(ref b, h2.Data);
-            });
-            commands.Add("!o2b", b =>
+                if (H2Tanks.ContainsKey(b.Key)) b.SetData(H2Tanks[b.Key].Data);
+            };
+
+            c["!h2tankb"] = b =>
             {
-                if (GCM.justStarted)
+                if (!H2Tanks.ContainsKey(b.Key)) Lib.UpdateBarGraph(ref b, 0);
+                else
+                {
+                    if (!_p.SetupComplete) Lib.CreateBarGraph(ref b);
+                    Lib.UpdateBarGraph(ref b, H2Tanks[b.Key].Data);
+                }
+            };
+
+            c["!o2tank%"] = b =>
+            {
+                if (O2Tanks.ContainsKey(b.Key)) b.SetData(O2Tanks[b.Key].Data);
+            };
+
+            c["!o2tankb"] = b =>
+            {
+                if (!O2Tanks.ContainsKey(b.Key)) Lib.UpdateBarGraph(ref b, 0);
+                else
+                {
+                    if (!_p.SetupComplete) Lib.CreateBarGraph(ref b);
+                    Lib.UpdateBarGraph(ref b, O2Tanks[b.Key].Data);
+                }
+            };
+
+            c["!h2%"] = b => b.SetData(_h2, "#0.#%");
+
+            c["!o2%"] = b => b.SetData(_o2, "#0.#%");
+
+            c["!h2b"] = b =>
+            {
+                if (!_p.SetupComplete)
                     Lib.CreateBarGraph(ref b);
-                Lib.UpdateBarGraph(ref b, o2.Data);
-            });
-            commands.Add("!h2t", b =>
+                Lib.UpdateBarGraph(ref b, _h2);
+            };
+
+            c["!o2b"] = b =>
+            {
+                if (!_p.SetupComplete)
+                    Lib.CreateBarGraph(ref b);
+                Lib.UpdateBarGraph(ref b, _o2);
+            };
+
+            c["!h2t"] = b =>
             {
                 var t = HydrogenTime();
                 if (t == TimeSpan.Zero)
                     b.Data = invalid;
+
                 if (t.TotalHours >= 1)
                     b.Data = string.Format("{0,2}h {1,2}m", (long)t.TotalHours, (long)t.Minutes);
                 else
                     b.Data = string.Format("{0,2}m {1,2}s", (long)t.TotalMinutes, (long)t.Seconds);
                 //else
                 //    b.SetData(t.TotalSeconds);
-            });
+            };
 
-            commands.Add("!ice", b =>
-            {
-                var rate = 0d;
-                b.Data = InventoryUtilities.TryGetUseRate(ref Ice, ref IceOre, out rate) ? (rate / keen).ToString("G4") : invalid;
-            });
+            // c["!ice"] = b =>
+            // {
+            //     var rate = 0d;
+            //     b.Data = InventoryUtilities.TryGetUseRate(ref Ice, ref IceOre, out rate) ? (rate / keen).ToString("G4") : invalid;
+            // };
         }
 
         public override void Update()
         {
-            h2.Update();
-            o2.Update();
-        }
+            _h2 = _o2 = 0;
+            foreach (var t in H2Tanks.Values)
+                if (!t.IsValid()) _closed.Add(t.Name);
+                else
+                {
+                    t.Update();
+                    _h2 += t.Data;
+                }
 
-        #endregion
-        double HydrogenStatus() => TankStatus(ref HydrogenTanks, true);
-        double OxygenStatus() => TankStatus(ref OxygenTanks, true);
-
-        double TankStatus(ref List<IMyGasTank> tanks, bool pct)
-        {
-            var amt = 0d;
-            var total = amt;
-            for (int i = 0; i < tanks.Count; i++)
+            int i = _closed.Count, c;
+            for (; --i > 0;)
             {
-                amt += tanks[i].FilledRatio * tanks[i].Capacity;
-                total += tanks[i].Capacity;
+                H2Tanks.Remove(_closed[i]);
+                _closed.RemoveAt(i);
             }
-            return pct ? amt / total : amt;
+
+            c = H2Tanks.Count;
+            if (c > 0) _h2 /= c;
+
+            foreach (var t in O2Tanks.Values)
+                if (!t.IsValid()) _closed.Add(t.Name);
+                else t.Update();
+
+            i = _closed.Count;
+            for (; --i > 0;)
+            {
+                O2Tanks.Remove(_closed[i]);
+                _closed.RemoveAt(i);
+            }
+
+            c = O2Tanks.Count;
+            if (c > 0) _o2 /= c;
         }
+        #endregion
 
         TimeSpan HydrogenTime()
         {
             var ts = DateTime.Now;
-            var rate = MathHelperD.Clamp(lastH2 - h2.Data, 1E-50, double.MaxValue) / (ts - tsH2).TotalSeconds;
-            var value = h2.Data / rate;
-            lastH2 = h2.Data;
+            var rate = MathHelperD.Clamp(_lastH2 - _h2, 1E-50, double.MaxValue) / (ts - tsH2).TotalSeconds;
+            var value = _h2 / rate;
+            _lastH2 = _h2;
             tsH2 = ts;
             if (rate < 1E-15 || double.IsNaN(value) || value > 1E5)
                 return TimeSpan.Zero;
@@ -525,89 +269,73 @@ namespace IngameScript
         }
     }
 
-    public class InventoryItem
+    public class InventoryItem : Info
     {
-        public double Data{get; protected set;}
-        public bool Changed => Data != _lastData;
-        protected double _lastData = 0;
         public readonly MyItemType Type;
-        public readonly int ID;
+        public string ID => Tag + '!' + Type.SubtypeId;
         public readonly string Tag, Format;
+        protected readonly InventoryUtilities Inventory;
         public InventoryItem(string t, string st, string f = "")
         {
             Tag = t;
             Format = f;
             if (st == InventoryUtilities.J)
                 return;
-            Type = new MyItemType(InventoryUtilities.objBldr + '_' + Tag, st);
-            ID = Type.GetHashCode();
+            Type = new MyItemType(InventoryUtilities.myObjectBuilder + '_' + Tag, st);
         }
         protected InventoryItem(InventoryItem d)
         {
             Tag = d.Tag;
             Format = d.Format;
             Type = d.Type;
-            ID = d.ID;
         }
-        public void AddAmount(int i) => Data += i;
-        public void Clear()
-        {
-            _lastData = Data;
-            Data = 0;
-        }
-        public string ToString(bool f = false) => f ? Data.ToString(Format) : Data.ToString();
+        public void AddAmount(int i) => value += i;
+        public void Clear() => value = 0;
+
+        public string ToString(bool f = false) => f ? value.ToString(Format) : value.ToString();
     }
 
-    public class ItemInfo : InventoryItem, IInfo
+    public class ItemInfo : InventoryItem
     {
-        List<IMyTerminalBlock> _invBlocks = null;
-        public ItemInfo(string t, string st, List<IMyTerminalBlock> i = null) : base(new InventoryItem(t, st))
+        IMyTerminalBlock Container;
+        public ItemInfo(string t, string st, IMyTerminalBlock i = null) : base(new InventoryItem(t, st))
         {
-            if (i != null)
-                _invBlocks = i.ToList();
+            Container = i;
+            if (i == null) return;
+
+            IsValid = () => i.Closed;
         }
-        public ItemInfo(InventoryItem d, List<IMyTerminalBlock> i = null) : base(d)
+        public ItemInfo(InventoryItem d, IMyTerminalBlock i = null) : base(d)
         {
-            if (i != null)
-                _invBlocks = i.ToList();
+            Container = i;
+            if (i == null) return;
+
+            IsValid = () => i.Closed;
         }
-        public void Update()
+        public override void Update()
         {
-            int i = _invBlocks.Count - 1, q;
-            Data = 0;
-            for (; i >= 0; i--)
-            {
-                q = 0;
-                if (_invBlocks[i].Closed)
-                    _invBlocks.RemoveAtFast(i);
-                var inv = _invBlocks[i]?.GetInventory();
-                if (inv == null)
-                    continue;
-                q = inv.GetItemAmount(Type).ToIntSafe();
-                Data += q;
-            }
+            //DebugString = "";
+            if (Container == null || !Container.HasInventory) return;
+            value = Container.GetInventory().GetItemAmount(Type).ToIntSafe();
         }
     }
 
-    public class InventoryUtilities
+    public class InventoryUtilities : UtilityBase
     {
-        public const string objBldr = "MyObjectBuilder", J = "JIT";
-        
+        public static string myObjectBuilder = "MyObjectBuilder", J = "JIT";
         public string Section, DebugString;
         int updateStep = 5, ibPtr;
         bool ignoreTanks, ignoreGuns, ignoreSMConnectors, vanilla;
+        string _dat;
         public bool needsUpdate;
         List<IMyTerminalBlock> InventoryBlocks = new List<IMyTerminalBlock>();
         public int Count => InventoryBlocks.Count;
         Dictionary<int, string[]>
             itemKeys = new Dictionary<int, string[]>(),
             itemTags = new Dictionary<int, string[]>();
-        Program _p;
-        DataGroup[] _itemGroups;
         List<MyInventoryItem> ItemScan = new List<MyInventoryItem>();
         // you know i had to do it to em
-        public Dictionary<int, InventoryItem> Items = new Dictionary<int, InventoryItem>();
-        Dictionary<int, DataGroup> _itemGroupMap = new Dictionary<int, DataGroup>();
+        public SortedList<string, InventoryItem> Items = new SortedList<string, InventoryItem>();
 
         DebugAPI Debug;
         public int Pointer => ibPtr + 1;
@@ -777,7 +505,7 @@ namespace IngameScript
 
         public void ScanInventories()
         {
-            int key;
+            string key;
             ItemScan.Clear();
             var inv = InventoryBlocks[ibPtr]?.GetInventory();
             if (inv == null)
@@ -790,96 +518,43 @@ namespace IngameScript
             inv.GetItems(ItemScan);
             for (int j = 0; j < ItemScan.Count; j++)
             {
-                key = ItemScan[j].Type.GetHashCode();
+                key = ItemScan[j].Type.TypeId.Substring(16) + '!' + ItemScan[j].Type.SubtypeId;
                 if (Items.ContainsKey(key))
                     Items[key].AddAmount(inv.GetItemAmount(Items[key].Type).ToIntSafe());
             }
         }
 
-        public static bool TryGetUseRate(ref UseRate r, ref ItemInfo item, out double rate)
+        public static bool TryGetUseRate(ref UseRate r, double d, out double rate)
         {
-            rate = r.Rate(item.Data);
+            rate = r.Rate(d);
             if (rate <= 0) return false;
             return true;
         }
 
-        void BindItemGroup(int id, string key)
+        void AddItemGroup(int id, string key)
         {
-            if (_itemGroupMap.ContainsKey(id))
-                return;
-            for (int i = 0; i < _itemGroups.Length; i++)
-            {
-                var igrp = _itemGroups[i];
-                if (igrp.Name == key)
-                    _itemGroupMap.Add(id, igrp);
-            }
-        }
-
-        void UpdateItemString(int id, ref SpriteData d)
-        {
-            if (!_itemGroupMap.ContainsKey(id))
-                return;
-            d.Data = "";
-            var g = _itemGroupMap[id];
-            d.Data = $"{g.Tags[0]}{Items[g.Keys[0]].ToString(true)}";
-            for (int i = 1; i < g.Keys.Length; i++)
-                d.Data += $"\n{g.Tags[i]}{Items[g.Keys[i]].ToString(true)}";
-        }
-
-        #region UtilityBase
-
-        public void Reset(Program program)
-        {
-            _p = program;
-            InventoryBlocks.Clear();
-            _p.GTS.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
-            {
-                if (b.BlockDefinition.SubtypeId == "LargeInteriorTurret")
-                    return false;
-                if (ignoreTanks && b is IMyGasTank)
-                    return false;
-                if (ignoreGuns && b is IMyUserControllableGun)
-                    return false;
-                if (ignoreSMConnectors && b is IMyShipConnector && b.WorldVolume.Radius <= 0.5)
-                    return false;
-                if (b.HasInventory && b.IsSameConstructAs(_p.Me))
-                    InventoryBlocks.Add(b);
-                return true;
-            });
-
             using (var p = new IniWrap())
-                if (!p.CustomData(_p.Me))
-                {
-                    vanilla = p.Bool(Section, "nilla", false);
-                    ignoreTanks = p.Bool(Section, "ignoreTanks", true);
-                    ignoreSMConnectors = p.Bool(Section, "ignoreSMC", true);
-                    ignoreGuns = vanilla & p.Bool(Section, "nogunz", true);
-                    updateStep = p.Int(Section, "invStep", 17);
-                    var grps = p.String(Section, _p.isCringe ? "itemGroups_v" : "itemGroups");
-                    if (!string.IsNullOrEmpty(grps))
+            {
+                MyIniParseResult result;
+                if (p.CustomData(_p.Me, out result))
+                    if (p.HasKey(Section, key))
                     {
-                        var a = grps.Split('\n');
-                        _itemGroups = new DataGroup[a.Length];
-
-                        int i = 0, j = 0;
-                        for (; i < a.Length; i++)
+                        var s = p.String(Section, key).Split('\n');
+                        if (s.Length > 0)
                         {
-                            var s = p.String(Section, a[i]).Split('\n');
-                            if (s.Length > 0)
+                            var k = new string[s.Length];
+                            var t = new string[s.Length];
+                            for (int i = 0; i < s.Length; i++)
                             {
-                                var k = new long[s.Length];
-                                var t = new string[s.Length];
-
-                                for (; j < s.Length; i++)
-                                {
-                                    var istr = s[j].Split(Lib.CMD);
-                                    InventoryItem item = null;
+                                var a = s[i].Split(cmd);
+                                if (!Items.ContainsKey(a[1] + cmd + a[2]))
                                     try
                                     {
-                                        if (istr.Length == 4)
-                                            item = new InventoryItem(istr[1], istr[2], istr[3]);
+                                        InventoryItem item = null;
+                                        if (a.Length == 4)
+                                            item = new InventoryItem(a[1], a[2], a[3]);
                                         else if (a.Length == 3)
-                                            item = new InventoryItem(istr[1], istr[2]);
+                                            item = new InventoryItem(a[1], a[2]);
                                         else
                                         {
                                             t[i] = "";
@@ -889,24 +564,75 @@ namespace IngameScript
                                     }
                                     catch (Exception) // keen dict problem
                                     { continue; }
-
-                                    k[i] = item?.ID ?? 0;
-                                    t[i] = a.Length != 3 && a.Length != 4 ? "" : istr[0] + " ";
-                                }
-
-                                _itemGroups[i] = new DataGroup
-                                {
-                                    Name = a[i],
-                                    Keys = k,
-                                    Tags = t
-                                };
+                                k[i] = a[1] + cmd + a[2];
+                                if (a.Length != 3 && a.Length != 4)
+                                    t[i] = "";
+                                else
+                                    t[i] = a[0] + " ";
+                            }
+                            if (!itemKeys.ContainsKey(id))
+                            {
+                                itemKeys.Add(id, k);
+                                itemTags.Add(id, t);
                             }
                         }
                     }
-                }
+                    else if (key != J)
+                        throw new Exception($"key {key} for command !itemslist not found in PB custom data.");
+            }
+
         }
 
-        public void Setup(ref Dictionary<string, Action<SpriteData>> commands)
+        void UpdateItemString(int id, ref SpriteData d)
+        {
+            if (!itemKeys.ContainsKey(id))
+                return;
+            _dat = "";
+            var itm = Items[itemKeys[id][0]];
+            _dat = $"{itemTags[id][0]}{Items[itemKeys[id][0]].ToString(true)}";
+            for (int i = 1; i < itemKeys[id].Length; i++)
+                _dat += $"\n{itemTags[id][i]}{Items[itemKeys[id][i]].ToString(true)}";
+            d.Data = _dat;
+        }
+
+        #region UtilityBase
+
+        public override void Reset(Program m)
+        {
+            using (var p = new IniWrap())
+                if (p.CustomData(m.Me))
+                {
+                    vanilla = p.Bool(Section, "nilla", false);
+                    ignoreTanks = p.Bool(Section, "ignoreTanks", true);
+                    ignoreSMConnectors = p.Bool(Section, "ignoreSMC", true);
+                    ignoreGuns = vanilla & p.Bool(Section, "nogunz", true);
+                    updateStep = p.Int(Section, "invStep", 17);
+                }
+            base.Reset(m);
+        }
+
+        public override void GetBlocks()
+        {
+            InventoryBlocks.Clear();
+            _p.GTS.GetBlocksOfType<IMyTerminalBlock>(null, (b) =>
+            {
+                bool r;
+                r = b.BlockDefinition.SubtypeId == "LargeInteriorTurret";
+
+                r |= ignoreTanks && b is IMyGasTank;
+
+                r |= ignoreGuns && b is IMyUserControllableGun;
+
+                r |= ignoreSMConnectors && b is IMyShipConnector && b.WorldVolume.Radius <= 0.5;
+
+                if (!r && b.HasInventory && b.IsSameConstructAs(_p.Me))
+                    InventoryBlocks.Add(b);
+
+                return false;
+            });
+        }
+
+        void JIT()
         {
             // JIT
             var d = 0d;
@@ -916,57 +642,68 @@ namespace IngameScript
             jitItem.Clear();
             var jitinfo = new ItemInfo(jitItem);
             var jitR = new UseRate(J);
-            BindItemGroup(Lib.SJIT.uID, J);
-            UpdateItemString(Lib.SJIT.uID, ref Lib.SJIT);
-            TryGetUseRate(ref jitR, ref jitinfo, out d);
+            AddItemGroup(jitSprite.uID, J);
+            UpdateItemString(jitSprite.uID, ref jitSprite);
+            TryGetUseRate(ref jitR, 0, out d);
+        }
+
+        public override void Setup(ref Dictionary<string, Action<SpriteData>> c)
+        {
+            JIT();
 
             itemKeys.Clear();
             itemTags.Clear();
             Items.Clear();
 
-            commands["!item"] = b =>
+            c["!item"] = b =>
             {
-                if (_p.Startup && b.Data != Lib.IVD)
+                if (!_p.SetupComplete && b.Data != invalid)
                     try
                     {
-                        if (b.Data.Contains(Lib.CMD) && !_itemGroupMap.ContainsKey(b.uID))
+                        if (b.Data.Contains(cmd))
                         {
-                            b.Data = b.Data.Trim();
-                            var s = b.Data.Split(Lib.CMD);
-                            int c = s[0].GetHashCode() + s[1].GetHashCode();
-                            if (!Items.ContainsKey(c))
-                                Items.Add(c, new InventoryItem(s[0], s[1], s.Length == 3 ? s[2] : ""));
-
-                            _itemGroupMap.Add(b.uID, new DataGroup { Name = b.Name, Keys = new int[] { c } });
-                            b.Data = Lib.IVD;
+                            if (!Items.ContainsKey(b.Data))
+                            {
+                                b.Data = b.Data.Trim();
+                                var s = b.Data.Split(cmd);
+                                if (s.Length == 2)
+                                    Items.Add(b.Data, new InventoryItem(s[0], s[1]));
+                                else if (s.Length == 3)
+                                    Items.Add(b.Data, new InventoryItem(s[0], s[1], s[2]));
+                            }
+                            if (!itemKeys.ContainsKey(b.uID))
+                            {
+                                itemKeys[b.uID] = new string[] { b.Data };
+                                b.Data = invalid;
+                            }
                         }
                     }
                     catch (Exception)
                     { throw new Exception($"\nError in data for sprite {b.Name} - invalid item key: {b.Data}."); }
-                b.SetData(Items[_itemGroupMap[b.uID].Keys[0]].Data);
+                b.SetData(Items[itemKeys[b.uID][0]].Data);
             };
 
-            commands["!itemslist"] = b =>
+            c["!itemslist"] = b =>
             {
-                if (_p.Startup && b.Data != "" && b.Data != Lib.IVD)
+                if (!_p.SetupComplete && b.Data != "" && b.Data != invalid)
                 {
-                    BindItemGroup(b.uID, b.Data);
-                    b.Data = Lib.IVD;
+                    AddItemGroup(b.uID, b.Data);
+                    b.Data = invalid;
                     return;
                 }
                 UpdateItemString(b.uID, ref b);
             };
 
-            commands["!invdebug"] = b =>
+            c["!invdebug"] = b =>
             {
-                if (!_p.Startup)
+                if (!!_p.SetupComplete)
                     return;
                 b.Data = $"INVENTORIES = {InventoryBlocks.Count}\n";
                 b.Data += ignoreGuns ? "WEAPONS NOT COUNTED" : "CHECKING WEAPONS";
             };
         }
 
-        public void Update()
+        public override void Update()
         {
             if (Items.Count == 0)
             {
@@ -993,16 +730,15 @@ namespace IngameScript
 
     public class FlightUtilities : UtilityBase
     {
-        List<IMyJumpDrive> JumpDrives = new List<IMyJumpDrive>();
-        double lastDist, maxDist, lastAccel, maxAccel, totalCharge;
-
-        const double TOL = 0.01, MAX_JD_PWR = 1 / 3E6;
+        Dictionary<string, Info> JumpDrives = new Dictionary<string, Info>();
+        double lastDist, maxDist, lastAccel, maxAccel;
+        const double dev = 0.01;
         readonly string tag, ctrl, fmat;
         string std;
         DateTime stopTS, accelTS; // fuck you
         Vector3D VZed = Vector3D.Zero, lastVel, grav;
-        Dictionary<int, Info> _jdVals = new Dictionary<int, Info>();
-        Dictionary<int, DataGroup> _jdGroupMap = new Dictionary<int, DataGroup>();
+        double _jdTotal;
+
         public FlightUtilities(string s, string f = "flightFMAT")
         {
             name = "Flight";
@@ -1012,124 +748,116 @@ namespace IngameScript
 
         #region UtilityBase
 
-
         public override void GetBlocks()
         {
             using (var p = new IniWrap())
             {
-                p.CustomData(GCM.Me);
+                p.CustomData(_p.Me);
                 std = p.String(tag, fmat, "0000");
-                GCM.Terminal.GetBlocksOfType(JumpDrives, b => b.IsSameConstructAs(Program.Me));
-                foreach (var j in JumpDrives)
-                    _jdVals.Add(j.CustomName.GetHashCode(), new Info(j.CustomName, () => j.CurrentStoredPower));
+                _p.GTS.GetBlocksOfType<IMyJumpDrive>(null, b =>
+                {
+                    var n = b.CustomName;
+                    if (b.IsSameConstructAs(_p.Me) && !JumpDrives.ContainsKey(n))
+                        JumpDrives[n] = new Info(n, () => b.CurrentStoredPower / b.MaxStoredPower, () => !b.Closed && b.IsFunctional);
+
+                    return false;
+                });
             }
         }
 
-        public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
+        public override void Setup(ref Dictionary<string, Action<SpriteData>> c)
         {
+
             GetHorizonAngle();
             Accel();
             GetAlt(MyPlanetElevation.Sealevel);
             StoppingDist();
 
-            commands.Add("!horiz", b =>
-                 Validate(GetHorizonAngle(), ref b, "-#0.##; +#0.##" + "°"));
+            c["!horiz"] = b => Validate(GetHorizonAngle(), ref b, "-#0.##; +#0.##" + "°");
 
-            commands.Add("!c-alt", b =>
-                Validate(GetAlt(MyPlanetElevation.Sealevel), ref b, std));
+            c["!c-alt"] = b => Validate(GetAlt(MyPlanetElevation.Sealevel), ref b, std);
 
-            commands.Add("!s-alt", b =>
-                Validate(GetAlt(MyPlanetElevation.Surface), ref b, std));
+            c["!s-alt"] = b => Validate(GetAlt(MyPlanetElevation.Surface), ref b, std);
 
-            commands.Add("!stop", b =>
-                Validate(StoppingDist(), ref b, std));
+            c["!stop"] = b => Validate(StoppingDist(), ref b, std);
 
-            commands.Add("!accel", b => Validate(Accel(), ref b, std));
+            c["!accel"] = b => Validate(Accel(), ref b, std);
 
-            commands.Add("!damp", b =>
-            { // this should not be a problem (famous last words)
-                b.Data = GCM.Controller.DampenersOverride ? "ON" : "OFF";
-            });
-            commands.Add("!jdc", b =>
+            c["!damp"] = b => b.Data = _p.Controller.DampenersOverride ? "ON" : "OFF";
+
+            c["!j%"] = b =>
             {
-                if (GCM.justStarted && !_jdGroupMap.ContainsKey(b.uID))
+                if (JumpDrives.ContainsKey(b.Key)) b.SetData(JumpDrives[b.Key].Data);
+            };
+
+            c["!jb"] = b =>
+            {
+                if (!JumpDrives.ContainsKey(b.Key)) Lib.UpdateBarGraph(ref b, 0);
+                else
                 {
-                    if (b.Data.Contains(cmd))
-                    {
-                        var a = b.Data.Split('\n');
-                        var ints = new List<int>();
-                        foreach (var ln in a)
-                        {
-                            ln.Trim('|');
-                            foreach (var kvp in _jdVals)
-                                if (kvp.Value.Name == ln)
-                                    ints.
-                        }
-                    }
-
+                    if (!_p.SetupComplete) Lib.CreateBarGraph(ref b);
+                    Lib.UpdateBarGraph(ref b, JumpDrives[b.Key].Data);
                 }
-            });
-            commands.Add("!jdc", b => { if (_jdDict.ContainsKey(b.Key)) b.SetData(_jdDict[b.Key].Data); });
-            commands.Add("!jdc%", b => { if (_jdDict.ContainsKey(b.Key)) b.SetData(_jdDict[b.Key].Data * MAX_JD_PWR); });
-            commands.Add("!jdcb", b =>
-            {
-                if (GCM.justStarted)
-                    Lib.CreateBarGraph(ref b);
-                Lib.UpdateBarGraph(ref b, _jdDict[b.Key].Data * MAX_JD_PWR);
-            });
+            };
 
-            commands.Add("!jcharge%", b => b.SetData(totalCharge * MAX_JD_PWR, "#0.#%"));
-            commands.Add("!jchargeb", b =>
+            c["!total%"] = b => b.SetData(_jdTotal, "#0.#%");
+
+            c["!totalb"] = b =>
             {
-                if (GCM.justStarted)
-                    Lib.CreateBarGraph(ref b);
-                Lib.UpdateBarGraph(ref b, totalCharge * MAX_JD_PWR);
-            });
+                if (!_p.SetupComplete) Lib.CreateBarGraph(ref b);
+                Lib.UpdateBarGraph(ref b, _jdTotal);
+            };
 
         }
 
         public override void Update()
         {
-            for (int i = JumpDrives.Count - 1; i >= 0; i--)
-            {
-                var n = JumpDrives[i].CustomName;
-                if (JumpDrives[i].Closed)
+            _jdTotal = 0;
+
+            foreach (var jd in JumpDrives.Values)
+                if (!jd.IsValid()) _closed.Add(jd.Name);
+                else
                 {
-                    _jdDict.Remove(n);
-                    JumpDrives.RemoveAtFast(i);
+                    jd.Update();
+                    _jdTotal += jd.Data;
                 }
-                _jdDict[n].Update();
-                totalCharge += _jdDict[n].Data;
+
+            int i = _closed.Count, c;
+            for (; --i > 0;)
+            {
+                JumpDrives.Remove(_closed[i]);
+                _closed.RemoveAt(i);
             }
+
+            c = JumpDrives.Count;
+            if (c > 0) _jdTotal /= c;
+
         }
 
         #endregion
 
         bool GravCheck(out Vector3D grav) //wanted something nice and neat
         {
-            grav = GCM.Controller.GetNaturalGravity();
-            if (grav == VZed)
-                return false;
-            return true;
+            grav = _p.Controller.GetNaturalGravity();
+            return grav == VZed;
         }
 
         double GetHorizonAngle()
         {
-            if (!GravCheck(out grav))
-                return bad;
-            if (grav == VZed)
-                return bad;
+            if (!GravCheck(out grav)) return bad;
+
             grav.Normalize();
-            return Math.Asin(MathHelper.Clamp(GCM.Controller.WorldMatrix.Forward.Dot(grav), -1, 1));
+            return Math.Asin(MathHelper.Clamp(_p.Controller.WorldMatrix.Forward.Dot(grav), -1, 1));
         }
 
         double GetAlt(MyPlanetElevation elevation)
         {
-            if (!GravCheck(out grav))
-                return bad;
+            if (!GravCheck(out grav)) return bad;
+
             var alt = 0d;
-            if (GCM.Controller.TryGetPlanetElevation(elevation, out alt))
+            if (_p.Controller.TryGetPlanetElevation(elevation, out alt))
                 return alt;
+
             return bad;
         }
 
@@ -1137,10 +865,10 @@ namespace IngameScript
         {
             var ret = 0d;
             var ts = DateTime.Now;
-            if (GCM.justStarted)
-                return bad;
 
-            var current = GCM.Controller.GetShipVelocities().LinearVelocity;
+            if (!_p.SetupComplete) return bad;
+
+            var current = _p.Controller.GetShipVelocities().LinearVelocity;
             if (current.Length() < 0.037)
             {
                 lastAccel = 0;
@@ -1148,56 +876,61 @@ namespace IngameScript
             }
 
             var mag = (current - lastVel).Length();
-            if (mag > TOL)
-                ret += mag / (ts - accelTS).TotalSeconds;
+
+            if (mag > dev) ret += mag / (ts - accelTS).TotalSeconds;
 
             if (ret > maxAccel) maxAccel = ret;
 
             lastAccel = ret;
             accelTS = ts;
 
-            return ret <= TOL ? maxAccel : ret;
+            return ret <= dev ? maxAccel : ret;
         }
 
         double StoppingDist()
         {
-            double
-                ret = lastDist,
-                a = 0;
+            double ret = lastDist, a = 0;
             var ts = DateTime.Now;
 
-            var current = GCM.Controller.GetShipVelocities().LinearVelocity;
-            if (!GCM.justStarted)
+            var current = _p.Controller.GetShipVelocities().LinearVelocity;
+            if (!!_p.SetupComplete)
             {
-                if (!GCM.Controller.DampenersOverride || current.Length() < 0.037) return bad;
+                if (!_p.Controller.DampenersOverride || current.Length() < 0.037) return bad;
+
                 var mag = (lastVel - current).Length();
-                if (mag > TOL)
+                if (mag > dev)
                 {
                     a = mag / (ts - stopTS).TotalSeconds;
                     ret = current.Length() * current.Length() / (2 * a);
                     lastDist = ret;
                 }
             }
-
             if (ret > maxDist) maxDist = ret;
 
             lastVel = current;
             stopTS = ts;
 
-            return a <= TOL ? maxDist : ret;
+            return a <= dev ? maxDist : ret;
         }
     }
 
     public class PowerUtilities : UtilityBase
     {
+        Dictionary<string, ReactorData> Reactors = new Dictionary<string, ReactorData>();
+        class ReactorData
+        {
+            public double Max;
+            public Info Current;
+            public ItemInfo CurrentFuel;
+            public Func<bool> IsValid;
+        }
+
         List<IMyBatteryBlock> Batteries = new List<IMyBatteryBlock>();
-        List<IMyReactor> Reactors = new List<IMyReactor>();
         List<IMyPowerProducer>
             Engines = new List<IMyPowerProducer>(),
             AllPower = new List<IMyPowerProducer>();
         UseRate U;
-        ItemInfo Fuel;
-        double pmax;
+        double pmax, _fuelTotal;
         Info batt, pwr;
         const string I = "ON", O = "OFF", ur = "Ingot!Uranium";
         public PowerUtilities()
@@ -1206,53 +939,101 @@ namespace IngameScript
             U = new UseRate(ur);
         }
         #region UtilityBase
-        public override void Reset(GraphicsManager m, MyGridProgram p)
+        public override void Reset(Program p)
         {
-            base.Reset(m, p);
+            base.Reset(p);
             var a = ur.Split(cmd);
-            Fuel = new ItemInfo(a[0], a[1], Reactors.ToList<IMyTerminalBlock>());
+            _fuelTotal = 0;
         }
 
         public override void GetBlocks()
         {
             Batteries.Clear();
-            Reactors.Clear();
             Engines.Clear();
             AllPower.Clear();
-            GCM.Terminal.GetBlocksOfType(Batteries, (battery) => battery.IsSameConstructAs(GCM.Me));
-            GCM.Terminal.GetBlocksOfType(Reactors, (reactor) => reactor.IsSameConstructAs(GCM.Me));
-            GCM.Terminal.GetBlocksOfType(Engines, (generator) => generator.IsSameConstructAs(GCM.Me) && generator.CustomName.Contains("Engine"));
-            GCM.Terminal.GetBlocksOfType(AllPower, (power) => power.IsSameConstructAs(GCM.Me));
+            _p.GTS.GetBlocksOfType(Batteries, battery => battery.IsSameConstructAs(_p.Me));  
+            _p.GTS.GetBlocksOfType(Engines, generator => generator.IsSameConstructAs(_p.Me) && generator.CustomName.Contains("Engine"));
+            _p.GTS.GetBlocksOfType(AllPower, power => power.IsSameConstructAs(_p.Me));
+
+            Reactors.Clear();
+            _p.GTS.GetBlocksOfType<IMyReactor>(null, b =>
+            {
+                var n = b.CustomName;
+                if (b.IsSameConstructAs(_p.Me) && !Reactors.ContainsKey(n))
+                    Reactors[n] = new ReactorData
+                    {
+                        Max = b.MaxOutput,
+                        Current = new Info(n, () => b.CurrentOutput),
+                        CurrentFuel = new ItemInfo("Ingot", "Uranium", b),
+                        IsValid = () => !b.Closed && b.IsFunctional
+                    };
+
+                return false;
+            });
         }
 
-        public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
+        public override void Setup(ref Dictionary<string, Action<SpriteData>> c)
         {
             batt = new Info("bc%", BatteryCharge);
             pwr = new Info("pwr", Output);
 
-            commands.Add("!bcharge%", (b) =>
-                Validate(batt.Data, ref b, "#0.#%"));
+            c["!bcharge%"] = b => Validate(batt.Data, ref b, "#0.#%");
 
-            commands.Add("!bchargeb", b =>
+            c["!bchargeb"] = b =>
             {
-                if (GCM.justStarted)
+                if (!_p.SetupComplete)
                     Lib.CreateBarGraph(ref b);
                 Lib.UpdateBarGraph(ref b, batt.Data);
-            });
-            commands.Add("!gridgen%", b => b.SetData(pwr.Data / pmax, "#0.#%"));
-            commands.Add("!fuel", b => b.SetData(Fuel.Data, Fuel.Format));
-            commands.Add("!fission", b =>
+            };
+
+            c["!gridgen%"] = b => b.SetData(pwr.Data / pmax, "#0.#%");
+
+            c["!rfuel"] = b =>
+            {
+                if (Reactors.ContainsKey(b.Key)) b.SetData(Reactors[b.Key].CurrentFuel.Data);
+            };
+
+            c["!rpwrMW"] = b =>
+            {
+                if (Reactors.ContainsKey(b.Key)) b.SetData(Reactors[b.Key].Current.Data);
+            };
+
+            c["!rpwr%"] = b =>
+            {
+                ReactorData r;
+                if (Reactors.TryGetValue(b.Key, out r)) b.SetData(r.Current.Data / r.Max);
+            };
+
+            c["!fuel"] = b => b.SetData(_fuelTotal);
+
+            c["!fission"] = b =>
             {
                 var rate = 0d;
-                if (GCM.justStarted)
-                    b.Data = InventoryUtilities.TryGetUseRate(ref U, ref Fuel, out rate) ? $"{rate:000.0} KG/S" : "0 KG/S";
-            });
-            commands.Add("!gridcap", b => b.SetData(1 - (pwr.Data / pmax), "#0.#%"));
+                if (!_p.SetupComplete)
+                    b.Data = InventoryUtilities.TryGetUseRate(ref U, _fuelTotal, out rate) ? $"{rate:000.0} KG/S" : "0 KG/S";
+            };
+
+            c["!gridcap"] = b => b.SetData(1 - (pwr.Data / pmax), "#0.#%");
         }
 
         public override void Update()
         {
-            Fuel.Update();
+            _fuelTotal = 0;
+            foreach (var r in Reactors.Values)
+                if (!r.IsValid()) _closed.Add(r.Current.Name);
+                else
+                {
+                    r.Current.Update();
+                    r.CurrentFuel.Update();
+                    _fuelTotal += r.CurrentFuel.Data;
+                }
+
+            for (int i = _closed.Count; --i > 0;)
+            {
+                Reactors.Remove(_closed[i]);
+                _closed.RemoveAt(i);
+            }
+            
             batt.Update();
             pwr.Update();
         }
@@ -1260,10 +1041,9 @@ namespace IngameScript
         #endregion
         double BatteryCharge()
         {
-            if (Batteries.Count == 0)
-                return bad;
-            var charge = 0d;
-            var total = charge;
+            if (Batteries.Count == 0) return bad;
+
+            double charge = 0d, total = charge;
             for (int i = 0; i < Batteries.Count; i++)
             {
                 //if (battery == null) continue;
@@ -1275,8 +1055,8 @@ namespace IngameScript
 
         double Output()
         {
-            var sum = 0f;
-            pmax = 0;
+            var sum = pmax = 0f;
+
             for (int i = 0; i < AllPower.Count; i++)
             {
                 if (!AllPower[i].IsFunctional || !AllPower[i].Enabled)
@@ -1290,35 +1070,20 @@ namespace IngameScript
         }
     }
 
-    public class WeaponUtilities : UtilityBase
-    {
-        MyDefinitionId _pwr = new MyDefinitionId(typeof(VRage.Game.ObjectBuilders.Definitions.MyObjectBuilder_GasProperties), "Electricity");
-        Dictionary<long, string[]> _wpnTags = new Dictionary<long, string[]>();
-        Dictionary<long, Info> wpnData = new Dictionary<long, Info>(); // sprite uid to cached gun stats
-        Dictionary<long, IMyUserControllableGun> wpns = new Dictionary<long, IMyUserControllableGun>(); // eid to gun
-        public WeaponUtilities()
-        {
-            GCM.Terminal.GetBlocksOfType<IMyUserControllableGun>(null, b =>
-            {
-                var c = b.Components.Get<MyResourceSinkComponent>();
-                return false;
-            });
-        }
-
-        public override void GetBlocks()
-        {
-
-        }
-
-        public override void Setup(ref Dictionary<string, Action<SpriteData>> commands)
-        {
-
-        }
-
-        public override void Update()
-        {
-
-        }
-
-    }
+    //public class WeaponUtilities : UtilityBase
+    //{
+    //   // MyDefinitionId _nrg = new MyDefinitionId()
+    //    Dictionary<long, string[]> wpnTags = new Dictionary<long, string[]>();
+    //    Dictionary<long, Info> wpnData = new Dictionary<long, Info>(); // sprite uid to cached gun stats
+    //    Dictionary<long, IMyUserControllableGun> wpns = new Dictionary<long, IMyUserControllableGun>(); // eid to gun
+    //    public WeaponUtilities()
+    //    {
+    //        name = "Weapons";
+    //        _p.GTS.GetBlocksOfType<IMyUserControllableGun>(null, b =>
+    //        {
+    //            var c = b.Components.Get<MyResourceSinkComponent>();
+    //            return false;
+    //        });
+    //    }
+    //}
 }

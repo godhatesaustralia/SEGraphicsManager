@@ -29,8 +29,8 @@ namespace IngameScript
                     isCringe = p.Bool(GCM, "vanillaFont", false);
                     useLogo = p.Bool(GCM, "logo", false);
                     larp = p.Bool(GCM, "larp", true);
-                    var ctrl = p.String(GCM, "shipCTRL", "[I]");
 
+                    var ctrl = p.String(GCM, "shipCTRL", "[I]");
                     GTS.GetBlocksOfType<IMyShipController>(null, b =>
                     {
                         if ((b.CustomName.Contains(ctrl) || b.IsMainCockpit) && b.IsSameConstructAs(Me))
@@ -38,9 +38,9 @@ namespace IngameScript
                         return false;
                     });
 
-                    var grps = p.String(Lib.HDR, "groups").Split('\n');
-                    if (grps != null) foreach (var g in grps)
-                            _groups.Add(g, CreateGroup(g, p.String(Lib.HDR, g)));
+                    // var grps = p.String(Lib.HDR, "groups").Split('\n');
+                    // if (grps != null) foreach (var g in grps)
+                    //         _groups.Add(g, CreateGroup(g, p.String(Lib.HDR, g)));
                 }
                 else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
         }
@@ -58,7 +58,7 @@ namespace IngameScript
                 runtimes.Dequeue();
             runtimes.Enqueue(rt);
 
-            if (!setupComplete)
+            if (!SetupComplete)
                 RunSetup();
 
             p = Priority.Normal;
@@ -84,15 +84,14 @@ namespace IngameScript
 
             if (argument != "")
             {
-                var c = '!';
-                if (argument.Contains(Lib.CMD))
+                if (argument.Contains($"{Lib.CMD}"))
                 {
                     int j = 0, k;
-                    var urg = argument.Split(c);
+                    var urg = argument.Split(Lib.CMD);
                     // if (urg.Length == 3) 
                     {
                         for (; j < urg.Length; j++)
-                            urg[j] = urg[j].Trim().Trim(c);
+                            urg[j] = urg[j].Trim().Trim(Lib.CMD);
 
                         if (_displaysMaster.ContainsKey(urg[2]) && int.TryParse(urg[1], out j))
                         {
@@ -160,10 +159,13 @@ namespace IngameScript
                             {
                                 foreach (var d in FastDisplays)
                                     d.Reset();
+
                                 foreach (var d in Displays)
                                     d.Reset();
+
                                 foreach (var d in Static)
                                     d.Reset();
+
                                 Echo("All displays wiped, ready to restart.");
                                 Runtime.UpdateFrequency = Lib.NONE;
                                 return;
@@ -172,7 +174,7 @@ namespace IngameScript
                     }
                 }
             }
-            if (!setupComplete) return;
+            if (!SetupComplete) return;
 
             bool fast = (updateSource & UpdateType.Update10) != 0;
             if (fast)
@@ -206,9 +208,11 @@ namespace IngameScript
                     AverageRun = 0;
                     foreach (var qr in runtimes)
                         AverageRun += qr;
+
                     AverageRun /= rtMax;
                 }
                 string r = "===<GRAPHICS MANAGER>===\n\n";
+
                 if (draw) r += $">DRAWING DISPLAY {dPtr + 1}/{Displays.Count}";
                 else if (Inventory.needsUpdate)
                     r += $"INV {Inventory.Pointer}/{Inventory.Count}";
