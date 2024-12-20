@@ -11,6 +11,7 @@ namespace IngameScript
     static public class Lib
     {
         static public Dictionary<long, MyTuple<bool, float?>> GraphStorage = new Dictionary<long, MyTuple<bool, float?>>();
+        static public string bsods = "";
         static public int bsodsTotal = 0;
         public const SpriteType TXT = SpriteType.TEXT;
         public const TextAlignment CNR = TextAlignment.CENTER;

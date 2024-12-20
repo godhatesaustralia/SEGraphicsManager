@@ -38,11 +38,17 @@ namespace IngameScript
                         return false;
                     });
 
+                    Utilities.Add(new GasUtilities());
+                    Utilities.Add(new FlightUtilities(Tag));
+                    Utilities.Add(new PowerUtilities());
+
                     // var grps = p.String(Lib.HDR, "groups").Split('\n');
                     // if (grps != null) foreach (var g in grps)
                     //         _groups.Add(g, CreateGroup(g, p.String(Lib.HDR, g)));
                 }
                 else throw new Exception($" PARSE FAILURE: {Me.CustomName} cd error {result.Error} at {result.LineNo}");
+
+                Init(true);
         }
 
         public void Main(string argument, UpdateType updateSource)
@@ -72,14 +78,17 @@ namespace IngameScript
                 {
                     foreach (var d  in FastDisplays)
                         d.SetPriority();
+
                     foreach (var d in Displays)
                         d.SetPriority();
+
                     foreach (var d in Static)
                         d.ForceRedraw();
+
                     draw = true;
                     p |= Priority.Once;
                 }
-                Echo($"RUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun:0.####} ms\nPARSE CYCLES - {IniWrap.total}\nMYINI INSTANCES - {IniWrap.Count}\nFAILURES - {Lib.bsodsTotal}");
+                Echo($"RUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun:0.####} ms\nPARSE CYCLES - {IniWrap.total}\nMYINI INSTANCES - {IniWrap.Count}\nTOTAL FAILURES - {Lib.bsodsTotal}\nFAILURES - {Lib.bsods}");
             }
 
             if (argument != "")
@@ -101,10 +110,12 @@ namespace IngameScript
                                 case 0:
                                     FastDisplays[k].MFDSwitch(j, urg[0]);
                                     break;
+
                                 case 1:
                                 default:
                                     Displays[k].MFDSwitch(j, urg[0]);
                                     break;
+
                                 case 2:
                                     Static[k].MFDSwitch(j, urg[0]);
                                     break;
@@ -174,6 +185,7 @@ namespace IngameScript
                     }
                 }
             }
+
             if (!SetupComplete) return;
 
             bool fast = (updateSource & UpdateType.Update10) != 0;
@@ -197,7 +209,7 @@ namespace IngameScript
                 Inventory.Update();
             else
             {
-                //Utilities[Lib.Next(ref iPtr, Utilities.Count)].Update();
+                Utilities[Lib.Next(ref iPtr, Utilities.Count)].Update();
                 draw = iPtr == 0;
             }
 
@@ -216,11 +228,11 @@ namespace IngameScript
                 if (draw) r += $">DRAWING DISPLAY {dPtr + 1}/{Displays.Count}";
                 else if (Inventory.needsUpdate)
                     r += $"INV {Inventory.Pointer}/{Inventory.Count}";
-                //else r += $"UTILS {iPtr + 1}/{Utilities.Count} - {Utilities[iPtr].Name}";
+                else r += $"UTILS {iPtr + 1}/{Utilities.Count} - {Utilities[iPtr].Name}";
 
                 r += $"\nRUNS - {Frame}\nRUNTIME - {rt} ms\nAVG - {AverageRun:0.####} ms\nWORST - {WorstRun} ms, F{WorstFrame}";
                 //r = Inventory.DebugString; 
-                //Program.Echo(r);
+                Echo(r);
             }
         }
     }

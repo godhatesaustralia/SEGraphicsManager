@@ -68,6 +68,7 @@ namespace IngameScript
             var ts = s.dsp.TextureSize;
             var ss = s.dsp.SurfaceSize;
             Lib.bsodsTotal++;
+            Lib.bsods += (Lib.bsodsTotal > 1 ? ", " : "") + s.Name;
             var c = (ts - ss) / 2;
             var r = ts / ss;
             var uh = 20 * r + 0.5f * c;
@@ -357,6 +358,7 @@ namespace IngameScript
             var ts = s.dsp.TextureSize;
             var ss = s.dsp.SurfaceSize;
             Lib.bsodsTotal++;
+            Lib.bsods += (Lib.bsodsTotal > 1 ? ", " : "") + s.Name;
             var c = (ts - ss) / 2;
             var r = ts / ss;
             var uh = 20 * r + 0.5f * c;

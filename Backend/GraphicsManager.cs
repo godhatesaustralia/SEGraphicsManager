@@ -22,7 +22,7 @@ namespace IngameScript
         List<CoyLogo> logos = new List<CoyLogo>();
         MyCommandLine _cmd = new MyCommandLine();
         InventoryUtilities Inventory;
-
+        List<UtilityBase> Utilities = new List<UtilityBase>();
         HashSet<IMyTerminalBlock> DisplayBlocks = new HashSet<IMyTerminalBlock>();
 
         int dPtr, iPtr, // display pointers
@@ -72,6 +72,12 @@ namespace IngameScript
 
             Inventory.Reset(this);
             Inventory.Setup(ref Commands);
+
+            foreach (var u in Utilities)
+            {
+                u.Reset(this);
+                if (full) u.Setup(ref Commands);
+            }
 
             var g = GTS.GetBlockGroupWithName(Tag + " " + Name);
             if (g == null)
