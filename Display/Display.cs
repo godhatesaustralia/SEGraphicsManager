@@ -241,6 +241,7 @@ namespace IngameScript
     {
         #region fields
         public Priority BlockRefresh = 0;
+        public long NextRefreshF = REF_T;
         public Dictionary<string, Screen> Outputs = new Dictionary<string, Screen>();
         public Dictionary<int, string> ActiveScreens = new Dictionary<int, string>(); // active n of screens by surface index
         public Dictionary<int, HashSet<string>> ScreenNames = new Dictionary<int, HashSet<string>>();
@@ -252,6 +253,8 @@ namespace IngameScript
         public Color logoColor = Color.White;
         readonly IMyFunctionalBlock Host;
         const string m_lg = "_L";  // suffix for logo keys
+        const int REF_T = 320;
+        static MySprite X = new MySprite();
         #endregion
 
 
@@ -479,13 +482,21 @@ namespace IngameScript
                 if ((Outputs[n].Refresh & p) != 0)
                 {
                     var acs = Outputs[n];
-                    bool changed = false;
+                    bool changed = false, refresh = _p.F >= NextRefreshF;
                     foreach (var sn in acs.CommandUsers)
                         changed |= acs.Sprites[sn].CheckUpdate();
 
-                    if (!changed)
+                    if (!changed && !refresh)
                         continue;
+                
                     var f = acs.dsp.DrawFrame();
+
+                    if (refresh)
+                    {
+                        f.Add(X);
+                        NextRefreshF += REF_T;
+                    }
+
                     foreach (var s in acs.Sprites.Values)
                          f.Add(s.Sprite);
                     f.Dispose();

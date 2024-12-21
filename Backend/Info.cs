@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Runtime.InteropServices;
 using VRage.Game.ModAPI.Ingame;
 using VRage.Game.ModAPI.Ingame.Utilities;
 using VRageMath;
@@ -36,11 +37,10 @@ namespace IngameScript
             bar = 'b',
             pct = '%';
         protected string invalid = "••", name;
-
         public string Name => name.ToUpper();
         protected List<string> _closed = new List<string>();
         protected SpriteData jitSprite = new SpriteData();
-        protected const double bad = double.NaN;
+        protected const double BAD = double.NaN;
         #endregion
 
         public virtual void Reset(Program p)
@@ -78,42 +78,41 @@ namespace IngameScript
             H2Tanks = new Dictionary<string, Info>(),
             O2Tanks = new Dictionary<string, Info>();
 
-        //UseRate Ice;
-        //ItemInfo IceOre;
-        const int keen = 5;
+        // UseRate Ice;
+        // ItemInfo IceOre;
+        // const int keen = 5;
         DateTime tsH2;
+        int _totalH2, _totalO2;
         double _h2, _o2, _lastH2; // sigh
 
         public GasUtilities()
         {
             name = "Gas";
-            //Ice = new UseRate("Ore!Ice");
+            // Ice = new UseRate("Ore!Ice");
         }
 
         #region UtilityBase
 
         public override void GetBlocks()
         {
-
             H2Tanks.Clear();
-            _p.GTS.GetBlocksOfType<IMyGasTank>(null, b =>
-            {
-                var n = b.CustomName;
-                if (b.IsSameConstructAs(_p.Me) && b.BlockDefinition.SubtypeId.Contains("Hyd") && !H2Tanks.ContainsKey(n))
-                    H2Tanks[n] = new Info(n, () => b.FilledRatio, () => !b.Closed && b.IsFunctional);
-
-                return false;
-            });
-
             O2Tanks.Clear();
+
             _p.GTS.GetBlocksOfType<IMyGasTank>(null, b =>
             {
                 var n = b.CustomName;
-                if (b.IsSameConstructAs(_p.Me) && b.BlockDefinition.SubtypeId.Contains("Hyd") && !H2Tanks.ContainsKey(n) && !O2Tanks.ContainsKey(n))
-                    O2Tanks[n] = new Info(n, () => b.FilledRatio, () => !b.Closed && b.IsFunctional);
-
+                if (b.CubeGrid == _p.Me.CubeGrid)
+                {
+                    if (b.BlockDefinition.SubtypeId.Contains("Hyd") && !H2Tanks.ContainsKey(n))
+                        H2Tanks[n] = new Info(n, () => b.FilledRatio, () => !b.Closed && b.IsFunctional);
+                    else if (!b.BlockDefinition.SubtypeId.Contains("Hyd") && !O2Tanks.ContainsKey(n))
+                        O2Tanks[n] = new Info(n, () => b.FilledRatio, () => !b.Closed && b.IsFunctional);
+                }
                 return false;
             });
+
+            _totalH2 = H2Tanks.Count;
+            _totalO2 = O2Tanks.Count;
         }
 
         public override void Setup(ref Dictionary<string, Action<SpriteData>> c)
@@ -124,6 +123,30 @@ namespace IngameScript
             c["!h2tank%"] = b =>
             {
                 if (H2Tanks.ContainsKey(b.Key)) b.SetData(H2Tanks[b.Key].Data);
+            };
+
+            c["!h2allk"] = b =>
+            {
+                var s = "";
+                if (!_p.SetupComplete && b.Trim == 0)
+                    int.TryParse(b.Format, out b.Trim);
+                else foreach (var t in H2Tanks.Keys)
+                        s += t.Remove(0, b.Trim) + "\n";
+                
+                if (s != b.Data) b.Data = s;
+            };
+
+            c["!h2ct"] = b => b.Data = $"{H2Tanks.Count}/{_totalH2}";
+
+            c["h2all%"] = b =>
+            {
+                var s = "";
+                if (b.Format != "") foreach (var t in H2Tanks.Values)
+                        s += $"{t.Data:b.Format}\n";
+                else foreach (var t in H2Tanks.Values)
+                        s += $"{t.Data * 100:000}%\n";
+
+                 if (s != b.Data) b.Data = s;
             };
 
             c["!h2tankb"] = b =>
@@ -139,6 +162,31 @@ namespace IngameScript
             c["!o2tank%"] = b =>
             {
                 if (O2Tanks.ContainsKey(b.Key)) b.SetData(O2Tanks[b.Key].Data);
+            };
+
+            c["!o2allk"] = b =>
+            {
+                var s = "";
+                if (!_p.SetupComplete && b.Trim == 0)
+                    int.TryParse(b.Format, out b.Trim);
+                else foreach (var t in O2Tanks.Keys)
+                        b.Data += t.Remove(0, b.Trim) + "\n";
+
+                if (s != b.Data) b.Data = s;
+            };
+
+            c["!o2ct"] = b => b.Data = $"{O2Tanks.Count}/{_totalO2}";
+
+            c["o2all%"] = b =>
+            {
+                var s = "";
+
+                if (b.Format != "") foreach (var t in O2Tanks.Values)
+                       s += $"{t.Data:b.Format}\n";
+                else foreach (var t in O2Tanks.Values)
+                        s += $"{t.Data * 100:000}%\n";
+                
+                if (s != b.Data) b.Data = s;
             };
 
             c["!o2tankb"] = b =>
@@ -208,12 +256,18 @@ namespace IngameScript
                 _closed.RemoveAt(i);
             }
 
+            _closed.Clear();
+
             c = H2Tanks.Count;
             if (c > 0) _h2 /= c;
 
             foreach (var t in O2Tanks.Values)
                 if (!t.IsValid()) _closed.Add(t.Name);
-                else t.Update();
+                else
+                {
+                    t.Update();
+                    _o2 += t.Data;
+                }
 
             i = _closed.Count;
             for (; --i > 0;)
@@ -221,6 +275,8 @@ namespace IngameScript
                 O2Tanks.Remove(_closed[i]);
                 _closed.RemoveAt(i);
             }
+
+            _closed.Clear();
 
             c = O2Tanks.Count;
             if (c > 0) _o2 /= c;
@@ -773,6 +829,8 @@ namespace IngameScript
             GetAlt(MyPlanetElevation.Sealevel);
             StoppingDist();
 
+            c["!hrz"] = b => Validate(GetHorizonAngle(), ref b, "-00; +00" + "°");
+
             c["!horiz"] = b => Validate(GetHorizonAngle(), ref b, "-#0.##; +#0.##" + "°");
 
             c["!c-alt"] = b => Validate(GetAlt(MyPlanetElevation.Sealevel), ref b, std);
@@ -785,12 +843,15 @@ namespace IngameScript
 
             c["!damp"] = b => b.Data = _p.Controller.DampenersOverride ? "ON" : "OFF";
 
-            c["!j%"] = b =>
+            c["!jd%"] = b =>
             {
-                if (JumpDrives.ContainsKey(b.Key)) b.SetData(JumpDrives[b.Key].Data);
+                if (JumpDrives.ContainsKey(b.Key))
+                    if (b.Format != "")
+                        b.SetData(JumpDrives[b.Key].Data);
+                    else b.Data = $"{JumpDrives[b.Key].Data * 100:000}%";
             };
 
-            c["!jb"] = b =>
+            c["!jdb"] = b =>
             {
                 if (!JumpDrives.ContainsKey(b.Key)) Lib.UpdateBarGraph(ref b, 0);
                 else
@@ -800,9 +861,22 @@ namespace IngameScript
                 }
             };
 
-            c["!total%"] = b => b.SetData(_jdTotal, "#0.#%");
+            c["!jdall%"] = b =>
+            {
+                var s = "";
 
-            c["!totalb"] = b =>
+                if (b.Format != "")
+                    foreach (var j in JumpDrives.Values)
+                        s += $"\n{j.Data.ToString(b.Format)}";
+                else foreach (var j in JumpDrives.Values)
+                        s += $"\n{j.Data * 100:000}";
+
+                b.Data = s;
+            };
+
+            c["!jdtotal%"] = b => b.SetData(_jdTotal, "#0.#%");
+
+            c["!jdtotalb"] = b =>
             {
                 if (!_p.SetupComplete) Lib.CreateBarGraph(ref b);
                 Lib.UpdateBarGraph(ref b, _jdTotal);
@@ -815,21 +889,14 @@ namespace IngameScript
             _jdTotal = 0;
 
             foreach (var jd in JumpDrives.Values)
-                if (!jd.IsValid()) _closed.Add(jd.Name);
+                if (!jd.IsValid()) continue;
                 else
                 {
                     jd.Update();
                     _jdTotal += jd.Data;
                 }
 
-            int i = _closed.Count, c;
-            for (; --i > 0;)
-            {
-                JumpDrives.Remove(_closed[i]);
-                _closed.RemoveAt(i);
-            }
-
-            c = JumpDrives.Count;
+            int c = JumpDrives.Count;
             if (c > 0) _jdTotal /= c;
 
         }
@@ -844,7 +911,7 @@ namespace IngameScript
 
         double GetHorizonAngle()
         {
-            if (!GravCheck(out grav)) return bad;
+            if (!GravCheck(out grav)) return BAD;
 
             grav.Normalize();
             return Math.Asin(MathHelper.Clamp(_p.Controller.WorldMatrix.Forward.Dot(grav), -1, 1));
@@ -852,13 +919,13 @@ namespace IngameScript
 
         double GetAlt(MyPlanetElevation elevation)
         {
-            if (!GravCheck(out grav)) return bad;
+            if (!GravCheck(out grav)) return BAD;
 
             var alt = 0d;
             if (_p.Controller.TryGetPlanetElevation(elevation, out alt))
                 return alt;
 
-            return bad;
+            return BAD;
         }
 
         double Accel()
@@ -866,13 +933,13 @@ namespace IngameScript
             var ret = 0d;
             var ts = DateTime.Now;
 
-            if (!_p.SetupComplete) return bad;
+            if (!_p.SetupComplete) return BAD;
 
             var current = _p.Controller.GetShipVelocities().LinearVelocity;
             if (current.Length() < 0.037)
             {
                 lastAccel = 0;
-                return bad;
+                return BAD;
             }
 
             var mag = (current - lastVel).Length();
@@ -895,7 +962,7 @@ namespace IngameScript
             var current = _p.Controller.GetShipVelocities().LinearVelocity;
             if (!!_p.SetupComplete)
             {
-                if (!_p.Controller.DampenersOverride || current.Length() < 0.037) return bad;
+                if (!_p.Controller.DampenersOverride || current.Length() < 0.037) return BAD;
 
                 var mag = (lastVel - current).Length();
                 if (mag > dev)
@@ -951,7 +1018,7 @@ namespace IngameScript
             Batteries.Clear();
             Engines.Clear();
             AllPower.Clear();
-            _p.GTS.GetBlocksOfType(Batteries, battery => battery.IsSameConstructAs(_p.Me));  
+            _p.GTS.GetBlocksOfType(Batteries, battery => battery.IsSameConstructAs(_p.Me));
             _p.GTS.GetBlocksOfType(Engines, generator => generator.IsSameConstructAs(_p.Me) && generator.CustomName.Contains("Engine"));
             _p.GTS.GetBlocksOfType(AllPower, power => power.IsSameConstructAs(_p.Me));
 
@@ -995,13 +1062,20 @@ namespace IngameScript
 
             c["!rpwrMW"] = b =>
             {
-                if (Reactors.ContainsKey(b.Key)) b.SetData(Reactors[b.Key].Current.Data);
+                ReactorData r;
+                if (!Reactors.TryGetValue(b.Key, out r)) return;
+
+                if (b.Format == "") b.Data = $"{Reactors[b.Key].Current.Data / 1E6:000}";
+                else b.SetData(Reactors[b.Key].Current.Data);
             };
 
             c["!rpwr%"] = b =>
             {
                 ReactorData r;
-                if (Reactors.TryGetValue(b.Key, out r)) b.SetData(r.Current.Data / r.Max);
+                if (!Reactors.TryGetValue(b.Key, out r)) return;
+
+                if (b.Format == "") b.Data = $"{Reactors[b.Key].Current.Data / r.Max:000}%";
+                else b.SetData(Reactors[b.Key].Current.Data / r.Max);
             };
 
             c["!fuel"] = b => b.SetData(_fuelTotal);
@@ -1033,7 +1107,7 @@ namespace IngameScript
                 Reactors.Remove(_closed[i]);
                 _closed.RemoveAt(i);
             }
-            
+
             batt.Update();
             pwr.Update();
         }
@@ -1041,7 +1115,7 @@ namespace IngameScript
         #endregion
         double BatteryCharge()
         {
-            if (Batteries.Count == 0) return bad;
+            if (Batteries.Count == 0) return BAD;
 
             double charge = 0d, total = charge;
             for (int i = 0; i < Batteries.Count; i++)

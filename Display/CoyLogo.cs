@@ -188,7 +188,7 @@ namespace IngameScript
                 _pieces.Add(new SpriteGroup(
                         new List<MySprite>
                         {
-                            new MySprite(SpriteType.TEXT, "COYOTE ORBITAL", V2(256, 432), null, Color, vcr ? "VCRBold" : "White", rotation: (vcr ? 1.125f : 2.25f))
+                            new MySprite(SpriteType.TEXT, "COYOTE ORBITAL", V2(256, 432), null, Color, vcr ? "VCRBold" : "White", rotation: vcr ? 1.125f : 2.25f)
                         },
                         10,
                         10
