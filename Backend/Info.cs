@@ -872,9 +872,10 @@ namespace IngameScript
 
                 b.Data = s;
             };
-
-            c["!jdtotal%"] = b => b.SetData(_jdTotal, "#0.#%");
-
+            
+            if (!_p.isCringe) c["!jdtotal%"] = b => b.Data = (_jdTotal * 100).ToString("000") + '%';
+            else c["!jdtotal%"] = b => b.SetData(_jdTotal, "#0.#%");
+            
             c["!jdtotalb"] = b =>
             {
                 if (!_p.SetupComplete) Lib.CreateBarGraph(ref b);
@@ -1043,7 +1044,8 @@ namespace IngameScript
             batt = new Info("bc%", BatteryCharge);
             pwr = new Info("pwr", Output);
 
-            c["!bcharge%"] = b => Validate(batt.Data, ref b, "#0.#%");
+            if (_p.isCringe) c["!bcharge%"] = b => b.SetData(batt.Data, "#0.#%");
+            else c["!bcharge%"] = b => b.Data = (batt.Data * 100).ToString("000") + '%';
 
             c["!bchargeb"] = b =>
             {
@@ -1058,7 +1060,7 @@ namespace IngameScript
 
             c["!apwrMWt"] = b => b.SetData(pwr.Data);
 
-            c["!gridgen%"] = b => b.SetData(pwr.Data / _pmax, "#0.#%");
+            c["!gridgen%"] = b => b.SetData(pwr.Data / _pmax);
 
             c["!gridgenb"] = b =>
             {
