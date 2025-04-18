@@ -996,7 +996,7 @@ namespace IngameScript
             Engines = new List<IMyPowerProducer>(),
             AllPower = new List<IMyPowerProducer>();
         UseRate U;
-        double pmax, _fuelTotal;
+        double _rpwr, _bpwr, _pmax, _fuelTotal;
         Info batt, pwr;
         const string I = "ON", O = "OFF", ur = "Ingot!Uranium";
         public PowerUtilities()
@@ -1052,7 +1052,20 @@ namespace IngameScript
                 Lib.UpdateBarGraph(ref b, batt.Data);
             };
 
-            c["!gridgen%"] = b => b.SetData(pwr.Data / pmax, "#0.#%");
+            c["!rpwrMWt"] = b =>b.SetData(_rpwr);
+
+            c["!bpwrMWt"] = b => b.SetData(_bpwr);
+
+            c["!apwrMWt"] = b => b.SetData(pwr.Data);
+
+            c["!gridgen%"] = b => b.SetData(pwr.Data / _pmax, "#0.#%");
+
+            c["!gridgenb"] = b =>
+            {
+                if (!_p.SetupComplete)
+                    Lib.CreateBarGraph(ref b);
+                Lib.UpdateBarGraph(ref b, pwr.Data / _pmax);
+            };
 
             c["!rfuel"] = b =>
             {
@@ -1083,15 +1096,15 @@ namespace IngameScript
             {
                 var rate = 0d;
                 if (!_p.SetupComplete)
-                    b.Data = InventoryUtilities.TryGetUseRate(ref U, _fuelTotal, out rate) ? $"{rate:000.0} KG/S" : "0 KG/S";
+                    b.Data = InventoryUtilities.TryGetUseRate(ref U, _fuelTotal, out rate) ? $"{rate:000} KG/S" : "0 KG/S";
             };
 
-            c["!gridcap"] = b => b.SetData(1 - (pwr.Data / pmax), "#0.#%");
+            c["!gridcap"] = b => b.SetData(1 - (pwr.Data / _pmax), "#0.#%");
         }
 
         public override void Update()
         {
-            _fuelTotal = 0;
+            _fuelTotal = _rpwr = 0;
             foreach (var r in Reactors.Values)
                 if (!r.IsValid()) _closed.Add(r.Current.Name);
                 else
@@ -1099,6 +1112,7 @@ namespace IngameScript
                     r.Current.Update();
                     r.CurrentFuel.Update();
                     _fuelTotal += r.CurrentFuel.Data;
+                    _rpwr += r.Current.Data;
                 }
 
             for (int i = _closed.Count; --i > 0;)
@@ -1116,19 +1130,21 @@ namespace IngameScript
         {
             if (Batteries.Count == 0) return BAD;
 
-            double charge = 0d, total = charge;
+            double charge = _bpwr = 0, total = charge;
             for (int i = 0; i < Batteries.Count; i++)
             {
                 //if (battery == null) continue;
                 charge += Batteries[i].CurrentStoredPower;
                 total += Batteries[i].MaxStoredPower;
+
+                _bpwr += Batteries[i].CurrentOutput;
             }
             return charge / total;
         }
 
         double Output()
         {
-            var sum = pmax = 0f;
+            var sum = _pmax = 0f;
 
             for (int i = 0; i < AllPower.Count; i++)
             {
@@ -1136,7 +1152,7 @@ namespace IngameScript
                     continue;
 
                 sum += AllPower[i].CurrentOutput;
-                pmax += AllPower[i].MaxOutput;
+                _pmax += AllPower[i].MaxOutput;
             }
             return sum;
 

@@ -373,7 +373,7 @@ namespace IngameScript
 
         public Priority Setup(IMyTerminalBlock block, bool w = false)
         {
-            bool ok = true;
+            bool ok;
             var p = new IniWrap();
             byte index = 0;
             MyIniParseResult Result;
@@ -383,7 +383,7 @@ namespace IngameScript
                 if (block is IMyTextSurface)
                 {
                     var DisplayBlock = (IMyTextSurface)block;
-                    ok &= TryParse(ref DisplayBlock, ref p, ref index, out pri);
+                    ok = TryParse(ref DisplayBlock, ref p, ref index, out pri);
                     ret = pri;
 
                 }
@@ -399,7 +399,7 @@ namespace IngameScript
                         var surface = DisplayBlock.GetSurface(index);
                         //if (!Outputs.ContainsKey(surface))
                         //    Outputs.Add(surface, new Dictionary<string, SpriteData>());
-                        ok &= TryParse(ref surface, ref p, ref index, out pri);
+                        ok = TryParse(ref surface, ref p, ref index, out pri);
                         ret |= pri;
                     }
                 }
